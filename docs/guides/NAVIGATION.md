@@ -16,8 +16,8 @@ The app uses SwiftUI's `NavigationStack` with a centralized routing system:
 3. **Navigation Modifier** - Maps routes to actual views
 
 **Key Files**:
-- `Src/iOSJumpstart/iOSJumpstart/App/Navigation/AppNavigation.swift`
-- `Src/iOSJumpstart/iOSJumpstart/App/MainTabView.swift`
+- `Src/PhotoCards/PhotoCards/App/Navigation/AppNavigation.swift`
+- `Src/PhotoCards/PhotoCards/App/MainTabView.swift`
 
 ---
 
@@ -39,7 +39,7 @@ enum AppRoute: Hashable {
 }
 ```
 
-**File**: `Src/iOSJumpstart/iOSJumpstart/App/Navigation/AppNavigation.swift:14-20`
+**File**: `Src/PhotoCards/PhotoCards/App/Navigation/AppNavigation.swift:14-20`
 
 ### Step 2: Map Route to View
 
@@ -64,7 +64,7 @@ private func destinationView(for route: AppRoute) -> some View {
 }
 ```
 
-**File**: `Src/iOSJumpstart/iOSJumpstart/App/Navigation/AppNavigation.swift:76-95`
+**File**: `Src/PhotoCards/PhotoCards/App/Navigation/AppNavigation.swift:76-95`
 
 ### Step 3: Navigate to Your Screen
 
@@ -78,7 +78,7 @@ Button("View Product") {
 }
 ```
 
-**Full example**: `Src/iOSJumpstart/iOSJumpstart/App/MainTabView.swift:45`
+**Full example**: `Src/PhotoCards/PhotoCards/App/MainTabView.swift:45`
 
 ---
 

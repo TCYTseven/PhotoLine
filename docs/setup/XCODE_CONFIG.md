@@ -5,14 +5,14 @@
 ## 1. Open Project
 
 ```bash
-open iOSJumpstart.xcworkspace
+open PhotoCards.xcworkspace
 ```
 
-Select `iOSJumpstart` target in Xcode.
+Select `PhotoCards` target in Xcode.
 
 ## 2. Configure Bundle Identifier
 
-**Targets** → **iOSJumpstart** → **General**
+**Targets** → **PhotoCards** → **General**
 
 - **Bundle Identifier**: `com.yourname.iosstarter`
   - Must match the Bundle ID from Apple Developer Portal
