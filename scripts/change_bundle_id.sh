@@ -33,8 +33,8 @@ usage() {
     echo "  $0 com.mosal com.newcompany"
     echo ""
     echo "This will change:"
-    echo "  com.mosal.MyApp -> com.newcompany.MyApp"
-    echo "  com.mosal.MyAppTests -> com.newcompany.MyAppTests"
+    echo "  app.photocards.MyApp -> com.newcompany.MyApp"
+    echo "  app.photocards.MyAppTests -> com.newcompany.MyAppTests"
     exit 1
 }
 

@@ -11,7 +11,7 @@ extension Bundle {
     // This will get the bundle for the Authentication module
     static var authenticationBundle: Bundle {
         // Try to find the bundle using the explicit identifier
-        if let bundle = Bundle(identifier: "com.mosal.Authentication") {
+        if let bundle = Bundle(identifier: "app.photocards.ios.auth") {
             return bundle
         }
         

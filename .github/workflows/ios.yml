@@ -16,8 +16,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Set Default Scheme
         run: |
-          echo "iOSJumpstart" > default
-          echo "Using default scheme: iOSJumpstart"
+          echo "PhotoCards" > default
+          echo "Using default scheme: PhotoCards"
       - name: Resolve Device
         run: |
           # Calculate the device once and store it in GITHUB_ENV

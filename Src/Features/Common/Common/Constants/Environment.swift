@@ -1,6 +1,6 @@
 //
 //  Environment.swift
-//  iOSJumpstart
+//  PhotoCards
 //
 //
 //  This file provides backward compatibility with existing code.

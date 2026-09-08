@@ -1,6 +1,6 @@
 //
 //  NetworkLogger.swift
-//  iOSJumpstart
+//  PhotoCards
 //
 //
 

@@ -1,6 +1,6 @@
 //
 //  Loadable.swift
-//  iOSJumpstart
+//  PhotoCards
 //
 //
 

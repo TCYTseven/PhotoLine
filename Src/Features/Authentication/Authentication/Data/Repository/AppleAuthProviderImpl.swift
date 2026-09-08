@@ -13,7 +13,7 @@ import UIKit
 import Common
 import os.log
 
-private let logger = Logger(subsystem: "com.mosal.iOSJumpstartApp.Authentication", category: "AppleAuth")
+private let logger = Logger(subsystem: "app.photocards.ios.Authentication", category: "AppleAuth")
 
 class AppleAuthProviderImpl: NSObject, AppleAuthProvider {
     func authenticate() async throws -> AuthModel.AppleAuthResult {

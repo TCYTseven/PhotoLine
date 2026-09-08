@@ -14,7 +14,7 @@ import Auth
 import Functions
 import os.log
 
-private let logger = Logger(subsystem: "com.mosal.iOSJumpstartApp.Authentication", category: "AuthRemoteDataSource")
+private let logger = Logger(subsystem: "app.photocards.ios.Authentication", category: "AuthRemoteDataSource")
 
 // Typealias to disambiguate from Supabase's Auth.AuthError
 typealias SupabaseAuthError = Auth.AuthError
