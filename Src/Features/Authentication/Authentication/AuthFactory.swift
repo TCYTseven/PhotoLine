@@ -10,12 +10,14 @@ import Factory
 import Common
 
 
-extension Container {
-    // Register repository and data sources
+public extension Container {
+    /// Full auth repository (sign-in, sign-out, account deletion).
     var authRepository: Factory<AuthRepository> {
         self { AuthRepositoryImpl() }
     }
+}
 
+extension Container {
     var authRemoteDataSource: Factory<AuthRemoteDataSource> {
         self { AuthRemoteDataSourceImpl() }
     }

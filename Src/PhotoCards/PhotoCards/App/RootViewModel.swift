@@ -2,22 +2,10 @@
 //  RootViewModel.swift
 //  PhotoCards
 //
+//  Guest sign-in. Players never see a login screen: on first launch we
+//  create an anonymous Supabase session and reuse it afterwards. Deleting
+//  the account (Settings) signs out and creates a brand-new guest.
 //
-
-// ============================================================
-// ROOT VIEW MODEL
-// ============================================================
-//
-// Single ViewModel for RootView. Handles:
-// • Authentication state management (via published authState)
-// • Event subscriptions (login, logout, subscription)
-// • Push notification registration
-// • Paywall scheduling
-//
-// Presentation state (@State) is owned by RootView, not this ViewModel.
-// View observes @Published properties to react to state changes.
-//
-// ============================================================
 
 import Foundation
 import SwiftUI
@@ -25,138 +13,68 @@ import Factory
 import Common
 import Events
 import Authentication
-import Subscription
-
-// ============================================================
-// MARK: - Auth State
-// ============================================================
-
-enum AuthState: Equatable {
-    case loading
-    case result(isAuthenticated: Bool)
-
-    var isAuthenticated: Bool {
-        if case .result(let authenticated) = self { return authenticated }
-        return false
-    }
-}
-
-// ============================================================
-// MARK: - Root View Model
-// ============================================================
 
 @MainActor
 final class RootViewModel: ObservableObject {
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Published State
-    // ════════════════════════════════════════════════════════
+    enum LaunchState: Equatable {
+        case loading
+        case unconfigured
+        case ready
+        case failed(String)
+    }
 
-    @Published private(set) var authState: AuthState = .loading
-    @Published private(set) var didSubscribe = false
+    @Published private(set) var launchState: LaunchState = .loading
+    /// Incremented every time the account is deleted so views can reset.
+    @Published private(set) var accountDeletionCount = 0
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Dependencies
-    // ════════════════════════════════════════════════════════
-
-    @Injected(\.authStatusRepository) private var authRepository: AuthStatusRepository
+    @Injected(\.authRepository) private var authRepository: AuthRepository
     @Injected(\.eventViewModel) private var eventViewModel: EventViewModel
-    @Injected(\.subscriptionManager) private var subscriptionManager: SubscriptionManager
-    @Injected(\.notificationService) private var notificationService: NotificationService
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Configuration
-    // ════════════════════════════════════════════════════════
-
-    private let paywallDelayAfterLogin: TimeInterval? = 3.0
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Initialization
-    // ════════════════════════════════════════════════════════
 
     init() {
-        subscribeToEvents()
+        eventViewModel.subscribe(for: self, to: [.authentication]) { [weak self] event in
+            guard event == .userLoggedOut else { return }
+            Task { @MainActor in
+                guard let self else { return }
+                self.accountDeletionCount += 1
+                await self.bootstrap()
+            }
+        }
     }
 
     deinit {
         Container.shared.eventViewModel().unsubscribe(self)
     }
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Auth Check
-    // ════════════════════════════════════════════════════════
-
-    func checkAuthStatus() async {
-        authState = .loading
-        let isAuthenticated = await authRepository.isAuthenticated()
-
-        if isAuthenticated {
-            eventViewModel.emit(.userLoggedIn)
-        } else {
-            authState = .result(isAuthenticated: false)
+    func bootstrap() async {
+        guard AppConfiguration.Supabase.isConfigured else {
+            launchState = .unconfigured
+            return
         }
-    }
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Paywall
-    // ════════════════════════════════════════════════════════
+        launchState = .loading
 
-    func schedulePaywallPresentation(present: @escaping () -> Void) {
-        guard let delay = paywallDelayAfterLogin else { return }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, !subscriptionManager.isSubscribed else { return }
-            present()
+        if await authRepository.isAuthenticated() {
+            launchState = .ready
+            return
         }
-    }
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Event Handling
-    // ════════════════════════════════════════════════════════
-
-    private func subscribeToEvents() {
-        eventViewModel.subscribe(
-            for: self,
-            to: [.authentication, .subscription],
-            handler: { [weak self] event in
-                Task { @MainActor in self?.handleEvent(event) }
-            }
-        )
-    }
-
-    private func handleEvent(_ event: EventViewModel.Event) {
-        switch event {
-        case .userLoggedIn:
-            withAnimation(.easeInOut(duration: 0.5)) {
-                authState = .result(isAuthenticated: true)
-            }
-            // TODO: Notification permission now handled in Showcase tab
-            // Task { await registerForPushNotifications() }
-
-        case .userLoggedOut:
-            withAnimation(.easeInOut(duration: 0.5)) {
-                authState = .result(isAuthenticated: false)
-            }
-
-        case .userSubscribed:
-            didSubscribe = true
-
-        default:
-            break
-        }
-    }
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Push Notifications
-    // ════════════════════════════════════════════════════════
-
-    private func registerForPushNotifications() async {
         do {
-            _ = try await notificationService.registerForPushNotifications()
+            _ = try await authRepository.signInAnonymously()
+            launchState = .ready
+        } catch let error as AuthError {
+            launchState = .failed(friendlyMessage(for: error))
         } catch {
-            #if DEBUG
-            print("[RootViewModel] Push registration failed: \(error)")
-            #endif
+            launchState = .failed("Check your internet connection and try again.")
+        }
+    }
+
+    private func friendlyMessage(for error: AuthError) -> String {
+        switch error {
+        case .networkError:
+            return "Check your internet connection and try again."
+        default:
+            return "We couldn't start a guest session. Please try again in a moment."
         }
     }
 }

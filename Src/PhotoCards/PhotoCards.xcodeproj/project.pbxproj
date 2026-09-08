@@ -18,9 +18,6 @@
 		2ACDE7CE2EFD4B600069757F /* NukeUI in Frameworks */ = {isa = PBXBuildFile; productRef = 2ANUKEUI12D8A189600247FE4 /* NukeUI */; };
 		2ADD3B172F03127200C68E16 /* Events.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2ADD3B162F03127200C68E16 /* Events.framework */; };
 		2ADD3B182F03127300C68E16 /* Events.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2ADD3B162F03127200C68E16 /* Events.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		2AFDE8702F03068D007E26F4 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AFDE86F2F03068D007E26F4 /* FirebaseCore */; };
-		2AFDE8722F03069C007E26F4 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 2AFDE8712F03069C007E26F4 /* FirebaseAnalytics */; };
-		2AFDE8742F0306A6007E26F4 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 2AFDE8732F0306A6007E26F4 /* FirebaseMessaging */; };
 		2AFDE9042F030E8D007E26F4 /* Repositories.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2AFDE9032F030E8D007E26F4 /* Repositories.framework */; };
 		2AFDE9052F030E8D007E26F4 /* Repositories.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2AFDE9032F030E8D007E26F4 /* Repositories.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2AFDE9072F030E97007E26F4 /* FileHandler.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2AFDE9062F030E97007E26F4 /* FileHandler.framework */; };
@@ -127,14 +124,11 @@
 				2AC862842F03D64600521E70 /* Supabase in Frameworks */,
 				2ACDE7CE2EFD4B600069757F /* NukeUI in Frameworks */,
 				2ADD3B172F03127200C68E16 /* Events.framework in Frameworks */,
-				2AFDE8742F0306A6007E26F4 /* FirebaseMessaging in Frameworks */,
 				2A0C4A292D8B39DE00247FE4 /* VideoSubscriberAccount.framework in Frameworks */,
-				2AFDE8722F03069C007E26F4 /* FirebaseAnalytics in Frameworks */,
 				2AFDE9042F030E8D007E26F4 /* Repositories.framework in Frameworks */,
 				2A0DED632D77711E009EC90C /* Authentication.framework in Frameworks */,
 				2A0C43EA2D824F8900247FE4 /* Subscription.framework in Frameworks */,
 				2AFDE90B2F030ECF007E26F4 /* Factory in Frameworks */,
-				2AFDE8702F03068D007E26F4 /* FirebaseCore in Frameworks */,
 				2AFDE90D2F030ECF007E26F4 /* FactoryKit in Frameworks */,
 				2A86F34F2D33903A00B3DD33 /* Common.framework in Frameworks */,
 				2AFDE9072F030E97007E26F4 /* FileHandler.framework in Frameworks */,
@@ -233,9 +227,6 @@
 			name = PhotoCards;
 			packageProductDependencies = (
 				2ANUKEUI12D8A189600247FE4 /* NukeUI */,
-				2AFDE86F2F03068D007E26F4 /* FirebaseCore */,
-				2AFDE8712F03069C007E26F4 /* FirebaseAnalytics */,
-				2AFDE8732F0306A6007E26F4 /* FirebaseMessaging */,
 				2AFDE90A2F030ECF007E26F4 /* Factory */,
 				2AFDE90C2F030ECF007E26F4 /* FactoryKit */,
 				2ASUPABASE2F039999007E26F5 /* Supabase */,
@@ -318,7 +309,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				2ANUKEREF12D8A189600247FE4 /* XCRemoteSwiftPackageReference "Nuke" */,
-				2AE104D22F03025200569424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				2AFDE9092F030ECF007E26F4 /* XCRemoteSwiftPackageReference "Factory" */,
 				2ASUPABASE2F039999007E26F4 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
@@ -699,14 +689,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		2AE104D22F03025200569424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 12.7.0;
-			};
-		};
 		2AFDE9092F030ECF007E26F4 /* XCRemoteSwiftPackageReference "Factory" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/hmlongco/Factory.git";
@@ -734,21 +716,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		2AFDE86F2F03068D007E26F4 /* FirebaseCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2AE104D22F03025200569424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseCore;
-		};
-		2AFDE8712F03069C007E26F4 /* FirebaseAnalytics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2AE104D22F03025200569424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalytics;
-		};
-		2AFDE8732F0306A6007E26F4 /* FirebaseMessaging */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2AE104D22F03025200569424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseMessaging;
-		};
 		2AFDE90A2F030ECF007E26F4 /* Factory */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 2AFDE9092F030ECF007E26F4 /* XCRemoteSwiftPackageReference "Factory" */;

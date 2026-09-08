@@ -2,17 +2,18 @@
 //  SupabaseClientService.swift
 //  Authentication
 //
-//  Supabase client singleton for authentication operations.
+//  Shared Supabase client. One instance for the whole app so auth, database,
+//  RPC and Realtime all share the same session.
 //
 
 import Foundation
 import Supabase
 import Common
 
-final class SupabaseClientService: @unchecked Sendable {
-    static let shared = SupabaseClientService()
+public final class SupabaseClientService: @unchecked Sendable {
+    public static let shared = SupabaseClientService()
 
-    let client: SupabaseClient
+    public let client: SupabaseClient
 
     private init() {
         client = SupabaseClient(
@@ -22,7 +23,7 @@ final class SupabaseClientService: @unchecked Sendable {
     }
 
     /// For testing purposes
-    init(client: SupabaseClient) {
+    public init(client: SupabaseClient) {
         self.client = client
     }
 }

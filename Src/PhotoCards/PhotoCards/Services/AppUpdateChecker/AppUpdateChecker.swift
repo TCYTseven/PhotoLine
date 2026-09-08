@@ -58,7 +58,11 @@ public final class AppUpdateChecker: AppUpdateCheckerProtocol {
             return nil
         }
 
-        let updateURL = URL(string: "https://apps.apple.com/app/id\(appStoreID)")!
+        // Prefer the store page URL Apple returns; fall back to the configured ID.
+        let storeURL = (appInfo["trackViewUrl"] as? String).flatMap { URL(string: $0) }
+        let updateURL = storeURL
+            ?? URL(string: "https://apps.apple.com/app/id\(appStoreID)")
+            ?? URL(string: "https://apps.apple.com")!
         let isUpdateAvailable = isVersionNewer(latestVersion, than: currentVersion)
         let isForceUpdateRequired = isMajorVersionNewer(latestVersion, than: currentVersion)
 

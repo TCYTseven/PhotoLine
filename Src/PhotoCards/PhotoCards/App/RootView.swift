@@ -2,223 +2,154 @@
 //  RootView.swift
 //  PhotoCards
 //
+//  Root of the app:
+//   • signs the player in as a guest (anonymous Supabase session)
+//   • hosts the navigation stack (home → create / join / browse / settings)
+//   • presents the live game full screen whenever a session is active
+//   • first-launch "how to play", account deletion, force update, offline banner
 //
-
-// ============================================================
-// ROOT VIEW
-// ============================================================
-//
-// Root of the app. Controls:
-// • Auth flow (full-page vs sheet)
-// • Onboarding overlay
-// • Force update blocking
-// • Network status banner
-// • Sheet presentations
-//
-// ============================================================
 
 import SwiftUI
 import Factory
 import Common
+import Authentication
 
 struct RootView: View {
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - ViewModel & Factory
-    // ════════════════════════════════════════════════════════
-
     @StateObject private var viewModel = RootViewModel()
-    private let viewFactory = RootViewFactory()
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Navigation
-    // ════════════════════════════════════════════════════════
-
     @StateObject private var navigator = AppNavigator()
+    @StateObject private var session = GameSessionStore(service: Container.shared.gameService())
+    @StateObject private var reviewManager = ReviewManager()
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - User Preferences
-    // ════════════════════════════════════════════════════════
+    @AppStorage(AppStorageKeys.isDarkMode) private var isDarkMode = false
+    @AppStorage(AppStorageKeys.hasSeenHowToPlay) private var hasSeenHowToPlay = false
+    @AppStorage(AppStorageKeys.playerName) private var playerName = ""
 
-    @AppStorage("isDarkMode") private var isDarkMode = false
-
-    #if DEBUG
-    @State var hasSeenOnboarding = false
-    #else
-    @AppStorage("hasSeenOnboarding") var hasSeenOnboarding = false
-    #endif
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Presentation State
-    // ════════════════════════════════════════════════════════
-
-    @State private var showAuthSheet = false
-    @State private var showLogoutSheet = false
     @State private var showDeleteAccountSheet = false
-    @State private var showPaywall = false
     @State private var forceUpdateInfo: AppUpdateInfo?
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Infrastructure
-    // ════════════════════════════════════════════════════════
-
-    @StateObject private var reviewManager = ReviewManager()
-    @Environment(\.scenePhase) var scenePhase
+    @Environment(\.scenePhase) private var scenePhase
     @Injected(\.networkMonitor) private var networkMonitor: NetworkMonitor
     @Injected(\.appUpdateChecker) private var appUpdateChecker: AppUpdateChecker
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Body
-    // ════════════════════════════════════════════════════════
+    @Injected(\.authCoordinator) private var authCoordinator: any AuthCoordinator
 
     var body: some View {
         VStack(spacing: 0) {
-            networkBanner
-            mainContent
+            if !networkMonitor.isConnected {
+                NetworkBanner()
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            content
         }
         .animation(.easeInOut(duration: 0.3), value: networkMonitor.isConnected)
-        .animation(.easeInOut(duration: 0.5), value: viewModel.authState)
         .environmentObject(navigator)
+        .environmentObject(session)
         .withDeepLinking(navigator: navigator)
         .task {
-            await viewModel.checkAuthStatus()
+            await viewModel.bootstrap()
         }
-        .onChange(of: scenePhase) { _, newPhase in handleScenePhaseChange(newPhase) }
-        .onChange(of: viewModel.authState) { _, newState in handleAuthStateChange(newState) }
-        .onChange(of: viewModel.didSubscribe) { _, didSubscribe in if didSubscribe { showPaywall = false } }
-        // ═══ Sheets ═══
-        .sheet(isPresented: $showAuthSheet) {
-            viewFactory.authenticationSheet(onSuccess: { showAuthSheet = false })
+        .onChange(of: viewModel.launchState) { _, newState in
+            if newState == .ready {
+                Task { await session.restoreActiveGame() }
+            }
         }
-        .sheet(isPresented: $showLogoutSheet) {
-            viewFactory.logoutSheet()
+        .onChange(of: viewModel.accountDeletionCount) { _, _ in
+            // A fresh guest identity: forget everything local as well.
+            playerName = ""
+            session.clearSession(message: nil)
+            navigator.popToRoot()
         }
+        .onChange(of: scenePhase) { _, phase in
+            handleScenePhase(phase)
+        }
+        // ═══ Live game ═══
+        .fullScreenCover(isPresented: Binding(
+            get: { session.isInGame && viewModel.launchState == .ready },
+            set: { _ in }
+        )) {
+            GameSessionView()
+                .environmentObject(session)
+                .environmentObject(navigator)
+        }
+        // ═══ First launch ═══
+        .fullScreenCover(isPresented: Binding(
+            get: { !hasSeenHowToPlay && viewModel.launchState == .ready },
+            set: { if !$0 { hasSeenHowToPlay = true } }
+        )) {
+            HowToPlayView(onDone: { hasSeenHowToPlay = true })
+        }
+        // ═══ Account deletion ═══
         .sheet(isPresented: $showDeleteAccountSheet) {
-            viewFactory.deleteAccountSheet()
+            AnyView(authCoordinator.deleteAccountSheet())
         }
-        .sheet(isPresented: $showPaywall) {
-            viewFactory.paywallView()
+        // ═══ Room closed / info ═══
+        .alert("Heads up", isPresented: Binding(
+            get: { session.infoMessage != nil },
+            set: { if !$0 { session.dismissInfo() } }
+        )) {
+            Button("OK") { session.dismissInfo() }
+        } message: {
+            Text(session.infoMessage ?? "")
         }
-    }
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Network Banner
-    // ════════════════════════════════════════════════════════
-
-    @ViewBuilder
-    private var networkBanner: some View {
-        if !networkMonitor.isConnected {
-            NetworkBanner()
-                .transition(.move(edge: .top).combined(with: .opacity))
-        }
-    }
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Main Content
-    // ════════════════════════════════════════════════════════
-
-    @ViewBuilder
-    private var mainContent: some View {
-        ZStack {
-            authStateContent
-            onboardingOverlay
-            forceUpdateOverlay
-        }
-    }
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Auth State Content
-    // ════════════════════════════════════════════════════════
-
-    @ViewBuilder
-    private var authStateContent: some View {
-        switch viewModel.authState {
-        case .loading:
-            loadingView
-
-        case .result(let isAuthenticated):
-            if isAuthenticated {
-                authenticatedContent
-            } else {
-                unauthenticatedContent
+        .overlay {
+            if let info = forceUpdateInfo, info.isForceUpdateRequired {
+                ForceUpdateView(updateInfo: info)
+                    .transition(.opacity)
             }
         }
     }
 
-    // ── Authenticated: Main App ─────────────────────────────
-    private var authenticatedContent: some View {
-        NavigationStack(path: $navigator.navigationPath) {
-            MainTabView(
-                isDarkMode: $isDarkMode,
-                onPresentAuth: { showAuthSheet = true },
-                onPresentLogout: { showLogoutSheet = true },
-                onPresentDeleteAccount: { showDeleteAccountSheet = true }
-            )
-            .withAppNavigator(onDeleteAccount: {
-                showDeleteAccountSheet = true
-            })
-        }
-        .transition(.opacity)
-    }
-
-    // ── Unauthenticated: Auth Page ──────────────────────────
-    private var unauthenticatedContent: some View {
-        viewFactory.authenticationPage(onSuccess: {})
-            .transition(.opacity)
-    }
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - Onboarding Overlay
-    // ════════════════════════════════════════════════════════
+    // MARK: - Content by launch state
 
     @ViewBuilder
-    private var onboardingOverlay: some View {
-        if !hasSeenOnboarding {
-            OnboardingView(onComplete: {
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    hasSeenOnboarding = true
-                }
-            })
+    private var content: some View {
+        switch viewModel.launchState {
+        case .loading:
+            LaunchStatusView(kind: .loading, retry: nil)
+        case .unconfigured:
+            LaunchStatusView(kind: .unconfigured, retry: nil)
+        case .failed(let message):
+            LaunchStatusView(kind: .failed(message), retry: { Task { await viewModel.bootstrap() } })
+        case .ready:
+            NavigationStack(path: $navigator.navigationPath) {
+                HomeView()
+                    .navigationDestination(for: AppRoute.self) { route in
+                        destination(for: route)
+                    }
+            }
+            .tint(PC.red)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .transition(.opacity)
         }
     }
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Force Update Overlay
-    // ════════════════════════════════════════════════════════
-
     @ViewBuilder
-    private var forceUpdateOverlay: some View {
-        if let updateInfo = forceUpdateInfo, updateInfo.isForceUpdateRequired {
-            ForceUpdateView(updateInfo: updateInfo)
-                .transition(.opacity)
+    private func destination(for route: AppRoute) -> some View {
+        switch route {
+        case .createGame:
+            CreateGameView()
+        case .joinGame(let code):
+            JoinGameView(prefilledCode: code)
+        case .browseGames:
+            BrowseGamesView()
+        case .promptPacks:
+            PromptPacksView()
+        case .settings:
+            SettingsView(onDeleteAccount: { showDeleteAccountSheet = true })
         }
     }
 
-    // ════════════════════════════════════════════════════════
-    // MARK: - Loading View
-    // ════════════════════════════════════════════════════════
+    // MARK: - Scene phase
 
-    private var loadingView: some View {
-        ZStack {
-            Theme.Colors.background.ignoresSafeArea()
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: Theme.Colors.primary))
-                .scaleEffect(1.5)
-        }
-    }
-
-    // ════════════════════════════════════════════════════════
-    // MARK: - State Change Handlers
-    // ════════════════════════════════════════════════════════
-
-    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
-        switch newPhase {
+    private func handleScenePhase(_ phase: ScenePhase) {
+        session.handleScenePhase(phase)
+        switch phase {
         case .active:
             reviewManager.startSession()
             Task { await checkForUpdates() }
+            if viewModel.launchState == .ready {
+                Task { await session.restoreActiveGame() }
+            }
         case .inactive, .background:
             if reviewManager.endSession() {
                 reviewManager.requestReview()
@@ -228,29 +159,66 @@ struct RootView: View {
         }
     }
 
-    private func handleAuthStateChange(_ newState: AuthState) {
-        guard case .result(let isAuthenticated) = newState else { return }
-
-        if isAuthenticated {
-            viewModel.schedulePaywallPresentation { showPaywall = true }
-        } else {
-            navigator.popToRoot()
-        }
-    }
-
     private func checkForUpdates() async {
-        guard let updateInfo = try? await appUpdateChecker.checkForUpdate(),
-              updateInfo.isForceUpdateRequired else { return }
-
-        await MainActor.run {
-            withAnimation { forceUpdateInfo = updateInfo }
-        }
+        guard let info = try? await appUpdateChecker.checkForUpdate(), info.isForceUpdateRequired else { return }
+        withAnimation { forceUpdateInfo = info }
     }
 }
 
-// ════════════════════════════════════════════════════════
-// MARK: - Preview
-// ════════════════════════════════════════════════════════
+// MARK: - Launch status screens
+
+struct LaunchStatusView: View {
+    enum Kind: Equatable {
+        case loading
+        case unconfigured
+        case failed(String)
+    }
+
+    let kind: Kind
+    let retry: (() -> Void)?
+
+    var body: some View {
+        ZStack {
+            PhotoBackdrop(imageURL: nil)
+            VStack(spacing: 18) {
+                LogoFanView(scale: 0.7)
+                switch kind {
+                case .loading:
+                    ProgressView().tint(.white)
+                    Text("Getting things ready…")
+                        .font(Font.poppins(.regular, size: 14))
+                        .foregroundColor(.white.opacity(0.8))
+                case .unconfigured:
+                    Text("Backend not configured")
+                        .font(Font.poppins(.bold, size: 20))
+                        .foregroundColor(.white)
+                    Text("Add your Supabase URL and anon key to AppConfiguration.swift and run supabase/schema.sql. See docs/SUPABASE_SETUP_GUIDE.md.")
+                        .font(Font.poppins(.regular, size: 14))
+                        .foregroundColor(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                case .failed(let message):
+                    Text("Couldn't connect")
+                        .font(Font.poppins(.bold, size: 20))
+                        .foregroundColor(.white)
+                    Text(message)
+                        .font(Font.poppins(.regular, size: 14))
+                        .foregroundColor(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    if let retry {
+                        Button("Try again", action: retry)
+                            .buttonStyle(PillButtonStyle())
+                            .frame(width: 200)
+                            .padding(.top, 6)
+                    }
+                }
+            }
+            .padding()
+        }
+        .preferredColorScheme(.dark)
+    }
+}
 
 #Preview {
     RootView()

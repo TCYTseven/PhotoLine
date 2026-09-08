@@ -11,7 +11,7 @@
 import Foundation
 import Supabase
 import Auth
-import Functions
+import PostgREST
 import os.log
 
 private let logger = Logger(subsystem: "app.photocards.ios.Authentication", category: "AuthRemoteDataSource")
@@ -109,22 +109,17 @@ class AuthRemoteDataSourceImpl: AuthRemoteDataSource {
     }
 
     func deleteAccount(token: String) async throws {
-        logger.debug("Deleting account via Edge Function")
+        logger.debug("Deleting account via delete_my_account RPC")
         do {
-            // Call the delete-user Edge Function
-            // The Edge Function validates the JWT and uses admin API to delete the user
-            // The invoke method throws on failure, returns Void on success
-            try await supabase.functions.invoke(
-                "delete-user",
-                options: FunctionInvokeOptions(
-                    headers: ["Authorization": "Bearer \(token)"]
-                )
-            )
-
+            // SECURITY DEFINER function defined in supabase/schema.sql. It removes
+            // the auth user; every app table cascades from auth.users.
+            _ = try await supabase.rpc("delete_my_account").execute()
+            // The server-side user is gone; drop the local session too.
+            try? await supabase.auth.signOut(scope: .local)
             logger.debug("Account deleted successfully")
-        } catch let error as FunctionsError {
-            logger.error("Edge function error: \(error.localizedDescription)")
-            throw AuthError.serverError(error.localizedDescription)
+        } catch let error as PostgrestError {
+            logger.error("delete_my_account failed: \(error.message)")
+            throw AuthError.serverError(error.message)
         } catch let error as AuthError {
             throw error
         } catch {

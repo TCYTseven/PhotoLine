@@ -684,6 +684,12 @@ begin
       'version',                 g.version,
       'created_at',              g.created_at,
       'prompt_packs',            v_packs,
+      'prompt_pack_slugs',       (select coalesce(jsonb_agg(pp.slug order by pp.sort_order), '[]'::jsonb)
+                                    from public.game_prompt_packs gpp
+                                    join public.prompt_packs pp on pp.id = gpp.pack_id
+                                    where gpp.game_id = g.id),
+      'custom_prompts',          (select coalesce(jsonb_agg(c.text order by c.created_at), '[]'::jsonb)
+                                    from public.game_custom_prompts c where c.game_id = g.id),
       'custom_prompt_count',     (select count(*) from public.game_custom_prompts c where c.game_id = g.id)
     ),
     'me', jsonb_build_object(

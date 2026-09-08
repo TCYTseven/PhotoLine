@@ -5,28 +5,18 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<!-- Google Sign-In URL scheme - replace YOUR_GOOGLE_CLIENT_ID with your actual client ID -->
-				<string>com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID</string>
-			</array>
-		</dict>
-		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.iosjumpstart.deeplink</string>
+			<string>app.photocards.ios.deeplink</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>iosjumpstart</string>
+				<string>photocards</string>
 			</array>
 		</dict>
 	</array>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Poppins-Black.ttf</string>
@@ -42,9 +32,7 @@
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
-		<string>Primary</string>
-		<key>UIImageName</key>
-		<string>LogoWhite</string>
+		<string>LaunchBackground</string>
 	</dict>
 </dict>
 </plist>

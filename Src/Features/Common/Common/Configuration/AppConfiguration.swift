@@ -31,6 +31,11 @@ public enum AppConfiguration {
     // Get these from: https://supabase.com/dashboard/project/_/settings/api
 
     public enum Supabase {
+        /// True once real credentials replaced the placeholders below.
+        public static var isConfigured: Bool {
+            !url.contains("YOUR_SUPABASE") && !anonKey.contains("YOUR_SUPABASE") && URL(string: url)?.host != nil
+        }
+
         #if DEBUG
         /// Your Supabase project URL (Debug)
         public static let url = "YOUR_SUPABASE_URL"
@@ -74,11 +79,12 @@ public enum AppConfiguration {
     // Configure your app's URL scheme and Universal Link domains
 
     public enum DeepLink {
-        /// Your app's custom URL scheme (e.g., "myapp" for myapp://)
-        public static let urlScheme = "yourapp"
+        /// Custom URL scheme: photocards://join?code=ABC123
+        public static let urlScheme = "photocards"
 
-        /// Your Universal Link domains (for iOS deep linking)
-        public static let universalLinkDomains = ["yourapp.com", "www.yourapp.com"]
+        /// Universal Link domains. Add your own domain (with an
+        /// apple-app-site-association file) to open https links directly.
+        public static let universalLinkDomains: [String] = []
     }
 
     // MARK: - API
@@ -115,26 +121,38 @@ public enum AppConfiguration {
 
         /// Bundle identifier from Info.plist
         public static var bundleID: String {
-            Bundle.main.bundleIdentifier ?? "com.yourcompany.yourapp"
+            Bundle.main.bundleIdentifier ?? "app.photocards.ios"
         }
 
         /// App display name from Info.plist
         public static var name: String {
             Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
                 ?? Bundle.main.infoDictionary?["CFBundleName"] as? String
-                ?? "YourApp"
+                ?? "PhotoCards"
         }
 
-        /// Support email for user inquiries
-        public static let supportEmail = "support@yourapp.com"
+        /// Public website (landing page, deployed from the repo's web/ folder).
+        public static let websiteURL = "https://tcytseven.github.io/PhotoLine/"
 
         /// Privacy policy URL
-        public static let privacyPolicyURL = "https://yourapp.com/privacy"
+        public static let privacyPolicyURL = "https://tcytseven.github.io/PhotoLine/privacy/"
 
         /// Terms of service URL
-        public static let termsOfServiceURL = "https://yourapp.com/terms"
+        public static let termsOfServiceURL = "https://tcytseven.github.io/PhotoLine/terms/"
 
-        /// App Store ID (numeric ID from App Store Connect)
-        public static let appStoreID = "YOUR_APP_STORE_ID"
+        /// Help & support page (also the App Store "Support URL")
+        public static let supportURL = "https://tcytseven.github.io/PhotoLine/support/"
+
+        /// Photo credits and open-source licenses
+        public static let licensesURL = "https://tcytseven.github.io/PhotoLine/licenses/"
+
+        /// Web page that shows a room code and deep-links into the app.
+        public static func joinURL(code: String) -> String {
+            "https://tcytseven.github.io/PhotoLine/join/?code=\(code)"
+        }
+
+        /// App Store ID (numeric ID from App Store Connect). Only used by the
+        /// update checker; leave empty until the app is listed.
+        public static let appStoreID = ""
     }
 }

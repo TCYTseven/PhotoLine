@@ -2,8 +2,11 @@
 //  DeepLinkCoordinator.swift
 //  PhotoCards
 //
-//  Coordinates deep link routing with app navigation.
-//  Maps DeepLinkRoute → AppRoute.
+//  Maps incoming links to app routes.
+//    photocards://join?code=ABC123  → join screen with the code filled in
+//    photocards://create            → create game
+//    photocards://browse            → public rooms
+//    photocards://settings          → settings
 //
 
 import Foundation
@@ -11,72 +14,38 @@ import Foundation
 @MainActor
 final class DeepLinkCoordinator: DeepLinkRouting {
 
-    // MARK: - Dependencies
-
     private weak var navigator: AppNavigator?
-
-    // MARK: - Initialization
 
     init(navigator: AppNavigator) {
         self.navigator = navigator
     }
 
-    // MARK: - DeepLinkRouting
-
     func route(to route: DeepLinkRoute) -> Bool {
-        guard let navigator else {
-            #if DEBUG
-            print("🔗 DeepLinkCoordinator: Navigator not available")
-            #endif
-            return false
-        }
-
-        // Map deep link route to app route
-        guard let appRoute = mapToAppRoute(route) else {
-            #if DEBUG
-            print("🔗 DeepLinkCoordinator: Unknown route: \(route.path)")
-            #endif
-            return false
-        }
-
-        #if DEBUG
-        print("🔗 DeepLinkCoordinator: Mapped \(route.path) → \(appRoute)")
-        #endif
-
-        // Perform navigation
-        performNavigation(to: appRoute, with: navigator)
+        guard let navigator else { return false }
+        guard let appRoute = mapToAppRoute(route) else { return false }
+        navigator.popToRoot()
+        navigator.navigate(to: appRoute)
         return true
     }
 
-    // MARK: - Route Mapping
-
     private func mapToAppRoute(_ route: DeepLinkRoute) -> AppRoute? {
         let path = route.path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
         switch path {
-        case "profile":
-            return .myProfile(userId: route.parameters["userId"])
+        case "join":
+            return .joinGame(code: route.parameters["code"])
+        case "create":
+            return .createGame
+        case "browse":
+            return .browseGames
+        case "prompts":
+            return .promptPacks
         case "settings":
-            return .settings(section: route.parameters["section"])
-        case "showcase":
-            return .showcase
-        case "more":
-            return .more
+            return .settings
         default:
+            if path.hasPrefix("join/"), let code = route.pathComponent(at: 1) {
+                return .joinGame(code: code)
+            }
             return nil
-        }
-    }
-
-    // MARK: - Navigation
-
-    private func performNavigation(to route: AppRoute, with navigator: AppNavigator) {
-        switch route {
-        case .showcase:
-            navigator.navigateToTab(0)
-        case .more:
-            navigator.navigateToTab(1)
-        case .myProfile, .settings:
-            navigator.navigate(to: route)
         }
     }
 }
