@@ -38,14 +38,14 @@ public enum AppConfiguration {
 
         #if DEBUG
         /// Your Supabase project URL (Debug)
-        public static let url = "YOUR_SUPABASE_URL"
+        public static let url = "https://zmmtljxkbzlqbtysduxo.supabase.co"
         /// Your Supabase anon/public key (Debug)
-        public static let anonKey = "YOUR_SUPABASE_ANON_KEY"
+        public static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptbXRsanhrYnpscWJ0eXNkdXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4ODk3MzAsImV4cCI6MjEwNDQ2NTczMH0.qUukjpgwYZbvtBa85Ts60pBLjzfXBpz3fY6g_izo6X4"
         #else
         /// Your Supabase project URL (Release)
-        public static let url = "YOUR_SUPABASE_URL"
+        public static let url = "https://zmmtljxkbzlqbtysduxo.supabase.co"
         /// Your Supabase anon/public key (Release)
-        public static let anonKey = "YOUR_SUPABASE_ANON_KEY"
+        public static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptbXRsanhrYnpscWJ0eXNkdXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4ODk3MzAsImV4cCI6MjEwNDQ2NTczMH0.qUukjpgwYZbvtBa85Ts60pBLjzfXBpz3fY6g_izo6X4"
         #endif
     }
 

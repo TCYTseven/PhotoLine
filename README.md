@@ -30,14 +30,13 @@ Native **SwiftUI** client, **Supabase** backend (Postgres + Realtime + Auth), no
 
 ## Quick start
 
-### 1. Backend (5 minutes)
+### 1. Backend
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor → New query**, paste the whole of [`supabase/schema.sql`](./supabase/schema.sql), run it.
-3. **Authentication → Providers → Anonymous sign-ins → enable.**
-4. Copy the **Project URL** and **anon key** from *Project Settings → API*.
+The production Supabase project (`zmmtljxkbzlqbtysduxo`, us-east-2) is already set up: [`supabase/schema.sql`](./supabase/schema.sql) has been applied as migrations, seeds are loaded, and the URL and anon key are in `AppConfiguration.swift`. One dashboard toggle can't be scripted:
 
-Full walkthrough: [docs/SUPABASE_SETUP_GUIDE.md](./docs/SUPABASE_SETUP_GUIDE.md)
+**Authentication → Providers → Anonymous sign-ins → enable.** Without it guest sign-in fails and the app shows "Couldn't connect".
+
+To stand up a second project (staging, your own fork): paste the whole of `supabase/schema.sql` into **SQL Editor → New query**, run it, enable anonymous sign-ins, and put that project's URL and anon key in `AppConfiguration.Supabase`. Full walkthrough: [docs/SUPABASE_SETUP_GUIDE.md](./docs/SUPABASE_SETUP_GUIDE.md)
 
 ### 2. App
 
@@ -47,16 +46,9 @@ cd PhotoLine
 open PhotoCards.xcworkspace
 ```
 
-Open `Src/Features/Common/Common/Configuration/AppConfiguration.swift` and fill in:
-
-| Placeholder | Value |
-|-------------|-------|
-| `YOUR_SUPABASE_URL` | Project URL, e.g. `https://abcd.supabase.co` |
-| `YOUR_SUPABASE_ANON_KEY` | anon / public key |
-
 Select your team under *Signing & Capabilities*, pick a bundle identifier, and run on three devices or simulators to play a full game.
 
-Until the placeholders are replaced the app shows a "Backend not configured" screen instead of crashing.
+The anon key is a public, RLS-protected key and is meant to ship in the client. If `AppConfiguration.Supabase` is ever reset to placeholders the app shows a "Backend not configured" screen instead of crashing.
 
 ### 3. Website (privacy policy, terms, support)
 

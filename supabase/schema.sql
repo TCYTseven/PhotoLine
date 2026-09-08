@@ -1964,8 +1964,13 @@ begin
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
   loop
+    -- Pin search_path everywhere (Supabase advisor 0011).
+    execute format('alter function %s set search_path = public', f.signature);
+
     if f.name in ('handle_new_user', 'set_updated_at') then
-      execute format('grant execute on function %s to supabase_auth_admin, authenticated, service_role', f.signature);
+      -- Trigger functions: only the auth service (and the owner) run them.
+      execute format('revoke all on function %s from public, anon, authenticated', f.signature);
+      execute format('grant execute on function %s to supabase_auth_admin, service_role', f.signature);
       continue;
     end if;
     execute format('revoke all on function %s from public, anon', f.signature);
