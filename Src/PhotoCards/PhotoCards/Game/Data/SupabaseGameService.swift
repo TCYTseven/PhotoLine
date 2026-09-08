@@ -125,8 +125,12 @@ final class SupabaseGameService: GameService, @unchecked Sendable {
     // MARK: - Realtime
 
     func observeGame(gameId: UUID) -> AsyncStream<Void> {
-        AsyncStream { continuation in
-            let channel = client.channel("game-\(gameId.uuidString.lowercased())")
+        AsyncStream { [client] continuation in
+            // Unique topic per observation: the client caches channels by
+            // topic, and re-using a topic that is still tearing down would
+            // silently drop the new listener.
+            let topic = "game-\(gameId.uuidString.lowercased())-\(UUID().uuidString.lowercased())"
+            let channel = client.channel(topic)
             let updates = channel.postgresChange(
                 UpdateAction.self,
                 schema: "public",
@@ -135,7 +139,13 @@ final class SupabaseGameService: GameService, @unchecked Sendable {
             )
 
             let task = Task {
-                await channel.subscribe()
+                do {
+                    try await channel.subscribeWithError()
+                } catch {
+                    #if DEBUG
+                    print("[SupabaseGameService] realtime subscribe failed: \(error)")
+                    #endif
+                }
                 for await _ in updates {
                     if Task.isCancelled { break }
                     continuation.yield(())
@@ -145,7 +155,8 @@ final class SupabaseGameService: GameService, @unchecked Sendable {
 
             continuation.onTermination = { _ in
                 task.cancel()
-                Task { await channel.unsubscribe() }
+                // removeChannel unsubscribes and evicts the channel from the cache.
+                Task { await client.removeChannel(channel) }
             }
         }
     }
