@@ -1,127 +1,45 @@
 # Complete Setup Guide
 
-Get your iOS Starter Kit running in **45-60 minutes**.
+Get PhotoCards running end to end in about **20 minutes**.
 
-**Requirements**: macOS, Xcode 16+, iOS 18+
-
----
-
-## Setup Steps
+**Requirements**: macOS, Xcode 16+, an Apple Developer account for device builds.
 
 | # | Task | Time | Guide |
 |---|------|------|-------|
-| 1 | Apple Developer Setup | 15 min | [→ Guide](./setup/APPLE_DEVELOPER.md) |
-| 2 | Clone Project | 2 min | Inline below |
-| 3 | Xcode Configuration | 5 min | [→ Guide](./setup/XCODE_CONFIG.md) |
-| 4 | Supabase Backend | 12 min | [→ Guide](./SUPABASE_SETUP_GUIDE.md) |
-| 5 | Firebase (Optional) | 8 min | [→ Guide](./setup/FIREBASE.md) |
-| 6 | Google OAuth | 10 min | [→ Guide](./setup/GOOGLE_OAUTH.md) |
-| 7 | RevenueCat | 10 min | [→ Guide](./REVENUECAT_SETUP_GUIDE.md) |
-| 8 | App Configuration | 5 min | [→ Guide](./setup/APP_CONFIGURATION.md) |
-| 9 | Build & Run | 2 min | Inline below |
+| 1 | Supabase backend | 5 min | [→ Guide](./SUPABASE_SETUP_GUIDE.md) |
+| 2 | App configuration | 2 min | [→ Guide](./setup/APP_CONFIGURATION.md) |
+| 3 | Apple Developer + Xcode signing | 10 min | [→ Apple](./setup/APPLE_DEVELOPER.md) · [→ Xcode](./setup/XCODE_CONFIG.md) |
+| 4 | Build & run | 2 min | below |
+| 5 | Website (privacy / terms / support) | 2 min | below |
 
----
-
-## 2. Clone Project
+## Build & run
 
 ```bash
-git clone https://github.com/yourusername/ios-starter-kit.git
-cd ios-starter-kit
-open iOSJumpstart.xcworkspace
+git clone https://github.com/TCYTseven/PhotoLine.git
+cd PhotoLine
+open PhotoCards.xcworkspace   # always the workspace, not the .xcodeproj
 ```
 
-**Important**: Always open `.xcworkspace`, NOT `.xcodeproj`
+Select the `PhotoCards` scheme and run. To play a full game you need **three** players: run on a device plus two simulators (each gets its own guest identity).
 
-### Optional: Rename App
+### Renaming / bundle ID
+
+The scripts from the starter kit still work:
 
 ```bash
-./scripts/rename_app.sh iOSJumpstart YourAppName
-./scripts/change_bundle_id.sh com.mosal com.yourname
+./scripts/rename_app.sh PhotoCards YourName
+./scripts/change_bundle_id.sh app.photocards com.yourcompany
 ```
 
----
+## Website
 
-## 9. Build & Run
+`.github/workflows/pages.yml` deploys `web/` to GitHub Pages on every push to `main`. Enable **Settings → Pages → Build and deployment → Source: GitHub Actions** once. The privacy policy, terms and support pages linked from the app live there.
 
-### Build
+## Verify
 
-1. In Xcode, select a simulator (e.g., iPhone 15 Pro)
-2. Press **⌘B** or Product → Build
-3. Wait for build to complete
-
-### Run
-
-1. Press **⌘R** or Product → Run
-2. App should launch in simulator
-3. Complete onboarding flow
-4. Test sign-in with Apple or Google
-
-### Verify
-
-Test these features:
-
-- ✅ Sign in with Apple works
-- ✅ Google Sign-In works
-- ✅ User profile loads
-- ✅ Subscription paywall appears (if configured)
-- ✅ Notifications permission request (if Firebase configured)
-
----
-
-## Troubleshooting
-
-### Build Errors
-
-**"No signing certificate"**
-- Ensure your Apple Developer account is active
-- Select your Team in Xcode → Signing & Capabilities
-
-**"Module not found"**
-- Clean build folder (⌘⇧K)
-- Close and reopen workspace
-
-**"AppConfiguration error"**
-- Verify all keys in AppConfiguration.swift
-- Check Supabase URL and anon key
-
-### Runtime Errors
-
-**Sign-in doesn't work**
-- Verify Supabase Auth providers are enabled
-- Check Google Client IDs in Info.plist and Supabase
-
-**Subscriptions don't load**
-- Verify RevenueCat API keys
-- Check StoreKit configuration file
-- Ensure products exist in App Store Connect
-
----
-
-## What's Next?
-
-### Development Guides
-
-Learn how to build features:
-
-- [Navigation](./guides/NAVIGATION.md) - Add new screens
-- [Events](./guides/EVENTS.md) - Cross-module communication
-- [Repositories](./guides/REPOSITORIES.md) - Data layer patterns
-- [File Uploads](./guides/FILE_UPLOADS.md) - Upload to Supabase storage
-- [Notifications](./guides/NOTIFICATIONS.md) - Permission handling
-- [Tabs](./guides/TABS.md) - Add tabs to TabView
-- [Dependency Injection](./guides/DEPENDENCY_INJECTION.md) - DI patterns
-
-### Deployment
-
-Ready to ship? See:
-
-- [Deployment Guide](./DEPLOYMENT.md) - TestFlight and App Store submission
-- [Troubleshooting](./TROUBLESHOOTING.md) - Common issues and fixes
-
----
-
-## Getting Help
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ios-starter-kit/issues)
-- **Troubleshooting**: [Troubleshooting Guide](./TROUBLESHOOTING.md)
-- **Contributing**: [Contributing Guide](./CONTRIBUTING.md)
+- [ ] Home screen shows the PhotoCards logo (not "Backend not configured")
+- [ ] Create room → lobby shows a six-letter code
+- [ ] Join from two more clients → host can start
+- [ ] Round runs: hand of 16 → submit → reveal → judge picks → results → next round
+- [ ] Settings → Privacy Policy opens the website
+- [ ] Settings → Delete account & data works and returns you home as a new guest

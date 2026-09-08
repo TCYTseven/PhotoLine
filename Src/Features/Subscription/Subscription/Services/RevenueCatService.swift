@@ -2,7 +2,7 @@
 //  RevenueCatService.swift
 //  Subscriptions
 //
-//  Created by iOSJumpstart Developer on 3/13/25.
+//  Created by PhotoCards Developer on 3/13/25.
 //
 
 import Foundation

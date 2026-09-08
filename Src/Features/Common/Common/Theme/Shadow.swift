@@ -1,6 +1,6 @@
 //
 //  Shadow.swift
-//  iOSJumpstart
+//  PhotoCards
 //
 //
 

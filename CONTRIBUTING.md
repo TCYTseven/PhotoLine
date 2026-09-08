@@ -46,7 +46,7 @@ git checkout -b feature/your-feature-name
 1. Open the workspace in Xcode:
 
 ```bash
-open iOSJumpstart.xcworkspace
+open PhotoCards.xcworkspace
 ```
 
 2. Configure your credentials for testing:

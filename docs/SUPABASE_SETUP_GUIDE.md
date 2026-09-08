@@ -1,198 +1,94 @@
 # Supabase Setup Guide
 
-**Time**: 12 min | **For**: Backend (Database + Auth + Storage)
+**Time**: 5 min | **For**: the whole PhotoCards backend (database, auth, realtime, storage)
 
-## 1. Create Project
+## 1. Create the project
 
-1. Go to [supabase.com](https://supabase.com) → **New Project**
-2. Fill in:
-   - **Name**: Your app name
-   - **Region**: Closest to your users
-   - **Password**: Save it (for database access)
-3. Wait ~2 minutes for project creation
+1. [supabase.com](https://supabase.com) → **New project**
+2. Pick a name, the region closest to your players, and a database password.
+3. Wait for provisioning (~2 min).
 
-### Get API Keys
+## 2. Run the schema
 
-Go to **Project Settings** → **API**:
+1. **SQL Editor → New query**
+2. Paste the entire contents of [`supabase/schema.sql`](../supabase/schema.sql)
+3. **Run**. The last statement prints the seed counts (`photos`, `prompt_packs`, `prompts`).
 
-**📋 Save these**:
-- **Project URL**: `https://yourproject.supabase.co`
-- **Anon Key**: `eyJhbGciOiJIUzI1NiIsIn...`
+The file is idempotent: running it again is safe (it uses `IF NOT EXISTS` / `CREATE OR REPLACE`).
 
----
+## 3. Enable anonymous sign-ins
 
-## 2. Authentication Setup
+**Authentication → Providers → Anonymous sign-ins → ON**
 
-### Apple Sign-In
+Players are guests; the app creates an anonymous session on first launch. (Apple / Google sign-in code is still present in the `Authentication` framework but is not part of the game flow.)
 
-1. **Supabase**: Dashboard → **Authentication** → **Providers** → **Apple**
-2. Toggle **Enable**
-3. Under **Authorized Client IDs**, paste your **Bundle ID** (from Xcode)
-4. Click **Save**
+## 4. Keys
 
-### Google Sign-In
+**Project Settings → API**: copy the **Project URL** and **anon public key** into `Src/Features/Common/Common/Configuration/AppConfiguration.swift` (`Supabase.url` / `Supabase.anonKey`, for both Debug and Release).
 
-Already configured via [Google OAuth Guide](./setup/GOOGLE_OAUTH.md).
+## 5. Check Realtime
+
+**Database → Replication** (or *Realtime* in newer dashboards): the `games` table should be part of the `supabase_realtime` publication. The schema adds it; this step just confirms it. Realtime is only used as a "something changed" signal; the app polls every four seconds as a fallback.
 
 ---
 
-## 3. Database Setup
+## What the schema creates
 
-Go to **SQL Editor** and run these scripts:
+| Section | Contents |
+|---------|----------|
+| Enums | `game_status`, `game_mode` (classic / vote / rapid), `game_phase` (lobby / choosing / judging / round_results / game_over) |
+| Tables | `profiles`, `banned_words`, `photos`, `prompt_packs`, `prompts`, `games`, `players`, `game_prompt_packs`, `game_custom_prompts`, `rounds`, `hands`, `player_photo_history`, `submissions`, `votes`, `reports`, `blocked_users` |
+| Triggers | profile auto-created for every auth user, `updated_at` maintenance |
+| RLS | Players can only **read** rooms they are in, only their **own** hand, submission and vote. Nobody writes game tables directly. Anonymous (not signed in) can read nothing. |
+| Engine RPCs | `create_game`, `update_game_settings`, `join_game`, `get_my_active_game`, `get_game_state`, `leave_game`, `set_ready`, `start_game`, `submit_photo`, `refresh_hand`, `pick_winner`, `cast_vote`, `advance_game`, `restart_game`, `list_public_games`, `list_prompt_packs`, `list_prompts` |
+| Account & moderation | `delete_my_account`, `update_display_name`, `report_content`, `block_user`, `unblock_user`, `list_blocked_users`, `cleanup_expired_games` (scheduled with pg_cron when available) |
+| Realtime | `games` in `supabase_realtime`, `REPLICA IDENTITY FULL` |
+| Storage | public bucket `photos` with a read policy |
+| Seeds | word filter, 6 prompt packs / 115 prompts, 154 starter photos |
 
-### Create Profiles Table
+### How a round flows on the server
+
+```
+start_game → _start_round
+              • judge = players ordered by join time, index (round-1) mod n (none in vote mode)
+              • prompt = unused custom prompt → unused pack prompt → any pack prompt
+              • _fill_hands tops every hand up to hand_size, avoiding repeats per player
+              • phase = choosing, phase_ends_at = now + round_timer
+submit_photo  • validates phase / judge / hand, removes the photo from the hand
+              • last submission → _to_judging (0 submissions → round with no winner)
+pick_winner / cast_vote / advance_game (timer) → _end_round → round_results
+advance_game (timer) → _next_round → game_over or _start_round
+```
+
+`advance_game` is idempotent and server-checked, so any client can call it when the countdown ends; the host nudges first.
+
+### Account deletion
+
+`delete_my_account()` deletes the caller's row from `auth.users`; every table cascades from it. If your project's `postgres` role cannot delete from `auth.users` (it can on standard Supabase projects), deploy the equivalent as an Edge Function using the service-role key and call it from `AuthRemoteDataSourceImpl.deleteAccount`.
+
+### Replacing the photo library
+
+Upload images to the `photos` bucket, then:
 
 ```sql
-create table public.profiles (
-  id uuid not null references auth.users on delete cascade,
-  email text,
-  full_name text,
-  avatar_url text,
-  updated_at timestamp with time zone,
-  primary key (id)
-);
+insert into public.photos (image_url, thumbnail_url, category, credit)
+values ('https://<project>.supabase.co/storage/v1/object/public/photos/cat-01.jpg', null, 'animals', 'Your name');
+-- optional: remove the starter photos
+delete from public.photos where credit = 'Lorem Picsum / Unsplash';
 ```
 
-### Enable Row Level Security
+### Reviewing reports
 
-```sql
-alter table public.profiles enable row level security;
-
--- Public profiles viewable by everyone
-create policy "Public profiles viewable"
-  on profiles for select using (true);
-
--- Users can insert own profile
-create policy "Users insert own profile"
-  on profiles for insert with check (auth.uid() = id);
-
--- Users can update own profile
-create policy "Users update own profile"
-  on profiles for update using (auth.uid() = id);
-```
-
-### Auto-Create Profile on Sign Up
-
-```sql
-create function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, full_name, avatar_url)
-  values (
-    new.id,
-    new.raw_user_meta_data ->> 'email',
-    new.raw_user_meta_data ->> 'full_name',
-    new.raw_user_meta_data ->> 'avatar_url'
-  );
-  return new;
-end;
-$$ language plpgsql security definer;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-```
-
----
-
-## 4. Storage Setup
-
-### Create Storage Bucket
-
-1. Go to **Storage** → **New bucket**
-2. Name: `storage`
-3. Toggle **Public bucket** ON
-4. Click **Create bucket**
-
-### Set Storage Policies
-
-Go to **Policies** tab on the bucket:
-
-```sql
--- Anyone can view files
-create policy "Public Access"
-  on storage.objects for select
-  using (bucket_id = 'storage');
-
--- Authenticated users can upload
-create policy "Authenticated users upload"
-  on storage.objects for insert
-  with check (bucket_id = 'storage' AND auth.role() = 'authenticated');
-
--- Users can update own files
-create policy "Users update own files"
-  on storage.objects for update
-  using (auth.uid()::text = (storage.foldername(name))[1]);
-
--- Users can delete own files
-create policy "Users delete own files"
-  on storage.objects for delete
-  using (auth.uid()::text = (storage.foldername(name))[1]);
-```
-
----
-
-## 5. Edge Functions (Optional)
-
-For admin operations like account deletion.
-
-### Create Delete Account Function
-
-1. In your project, create: `supabase/functions/delete-account/index.ts`
-
-```typescript
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-serve(async (req) => {
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  )
-
-  const authHeader = req.headers.get('Authorization')!
-  const token = authHeader.replace('Bearer ', '')
-  const { data: { user } } = await supabaseClient.auth.getUser(token)
-
-  if (!user) {
-    return new Response('Unauthorized', { status: 401 })
-  }
-
-  // Delete user
-  await supabaseClient.auth.admin.deleteUser(user.id)
-
-  return new Response(JSON.stringify({ success: true }), {
-    headers: { 'Content-Type': 'application/json' }
-  })
-})
-```
-
-### Deploy Function
-
-```bash
-npx supabase functions deploy delete-account
-```
-
----
+**Table editor → reports**. Set `status` to `reviewed`, and set `approved = false` on any photo you want out of rotation.
 
 ## ✅ Checklist
 
-- [ ] Supabase project created
-- [ ] API URL and anon key saved
-- [ ] Apple Sign-In enabled
-- [ ] Google Sign-In configured
-- [ ] Profiles table created
-- [ ] RLS policies enabled
-- [ ] Storage bucket created (`storage`)
-- [ ] Storage policies set
-- [ ] Edge function deployed (optional)
+- [ ] Project created
+- [ ] `supabase/schema.sql` run without errors
+- [ ] Anonymous sign-ins enabled
+- [ ] URL + anon key in `AppConfiguration.swift`
+- [ ] `games` in the realtime publication
 
-**Saved Values**:
-```
-Supabase URL: https://yourproject.supabase.co
-Anon Key: eyJhbGciOiJIUzI1NiIs...
-```
+## Next step
 
-## Next Step
-
-→ [Configure App Keys](./setup/APP_CONFIGURATION.md)
+→ [App configuration](./setup/APP_CONFIGURATION.md)

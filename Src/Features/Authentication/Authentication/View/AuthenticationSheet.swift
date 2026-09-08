@@ -61,7 +61,7 @@ struct AuthenticationSheet: View {
                     .foregroundColor(Theme.Colors.primary)
                 
                 VStack(spacing: 8) {
-                    Text("Welcome to iOSJumpstart")
+                    Text("Welcome to PhotoCards")
                         .font(Theme.Typography.title2)
                         .foregroundColor(Theme.Colors.text)
                     

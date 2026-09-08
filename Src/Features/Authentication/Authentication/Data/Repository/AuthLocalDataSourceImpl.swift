@@ -109,5 +109,5 @@ private struct TokenWrapper: Codable {
 
 // Keychain constants
 private enum KeychainKeys {
-    static let authToken = "com.mosal.Authentication.authToken"
+    static let authToken = "app.photocards.ios.auth.authToken"
 }

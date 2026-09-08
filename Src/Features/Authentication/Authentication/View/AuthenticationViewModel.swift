@@ -12,7 +12,7 @@ import Common
 import os.log
 import Events
 
-private let logger = Logger(subsystem: "com.mosal.iOSJumpstartApp.Authentication", category: "AuthViewModel")
+private let logger = Logger(subsystem: "app.photocards.ios.Authentication", category: "AuthViewModel")
 
 @Observable
 class AuthenticationViewModel {

@@ -96,4 +96,4 @@ private func eventType(for event: Event) -> EventType {
 
 **Reference**: `Src/Features/Events/Events/EventViewModel.swift`
 
-**Usage example**: `Src/iOSJumpstart/iOSJumpstart/App/RootViewModel.swift:45-85`
+**Usage example**: `Src/PhotoCards/PhotoCards/App/RootViewModel.swift:45-85`

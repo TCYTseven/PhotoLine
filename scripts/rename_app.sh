@@ -28,7 +28,7 @@ usage() {
     echo ""
     echo "Arguments:"
     echo "  OLD_NAME    Current app name (e.g., OldAppName)"
-    echo "  NEW_NAME    New app name (e.g., iOSJumpstart)"
+    echo "  NEW_NAME    New app name (e.g., PhotoCards)"
     echo ""
     echo "Example:"
     echo "  $0 OldAppName NewAppName"

@@ -91,16 +91,22 @@ public struct AuthenticationPage: View {
         VStack(spacing: 8) {
             Text("By continuing you agree to our")
                 .font(Theme.Typography.captionMedium)
-                .foregroundColor(Theme.Colors.textSecondary) +
-            Text(" Terms ")
-                .font(Theme.Typography.link)
-                .foregroundColor(Theme.Colors.primary) +
-            Text("and")
-                .font(Theme.Typography.captionMedium)
-                .foregroundColor(Theme.Colors.textSecondary) +
-            Text(" Privacy Policy")
-                .font(Theme.Typography.link)
-                .foregroundColor(Theme.Colors.primary)
+                .foregroundColor(Theme.Colors.textSecondary)
+            HStack(spacing: 6) {
+                if let url = URL(string: AppConfiguration.App.termsOfServiceURL) {
+                    Link("Terms of Service", destination: url)
+                        .font(Theme.Typography.link)
+                        .foregroundColor(Theme.Colors.primary)
+                }
+                Text("and")
+                    .font(Theme.Typography.captionMedium)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                if let url = URL(string: AppConfiguration.App.privacyPolicyURL) {
+                    Link("Privacy Policy", destination: url)
+                        .font(Theme.Typography.link)
+                        .foregroundColor(Theme.Colors.primary)
+                }
+            }
         }
         .multilineTextAlignment(.center)
         .padding(.horizontal, 24)

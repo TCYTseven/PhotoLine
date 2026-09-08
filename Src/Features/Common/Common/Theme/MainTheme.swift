@@ -1,6 +1,6 @@
 //
 //  MainTheme.swift
-//  iOSJumpstart
+//  PhotoCards
 //
 //
 

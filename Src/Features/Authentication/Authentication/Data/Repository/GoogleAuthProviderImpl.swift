@@ -13,7 +13,7 @@ import UIKit
 import Common
 import os.log
 
-private let logger = Logger(subsystem: "com.mosal.iOSJumpstartApp.Authentication", category: "GoogleAuth")
+private let logger = Logger(subsystem: "app.photocards.ios.Authentication", category: "GoogleAuth")
 
 class GoogleAuthProviderImpl: GoogleAuthProvider {
     private let clientID: String

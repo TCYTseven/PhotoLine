@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join a room – PhotoCards</title>
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-root="../">
+  <main>
+    <h1>You're invited to a PhotoCards room</h1>
+    <p class="muted">Open the app, tap <strong>Join game</strong> and enter this code:</p>
+    <div class="code-box" id="code">------</div>
+    <p><a class="cta" id="open" href="photocards://join">Open in the app</a></p>
+    <p class="muted small">Don't have the app yet? See the <a href="../support/#get-the-app">support page</a>.</p>
+  </main>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var code = (params.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+      if (code) {
+        document.getElementById('code').textContent = code;
+        document.getElementById('open').href = 'photocards://join?code=' + code;
+      }
+    })();
+  </script>
+  <script src="../assets/site.js"></script>
+</body>
+</html>

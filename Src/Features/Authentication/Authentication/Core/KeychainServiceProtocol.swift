@@ -31,7 +31,7 @@ public class KeychainService: KeychainServiceProtocol {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.mosal.Authentication"
+            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "app.photocards.ios.auth"
         ]
         
         // Delete existing item if it exists
@@ -41,7 +41,7 @@ public class KeychainService: KeychainServiceProtocol {
         let saveQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.mosal.Authentication",
+            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "app.photocards.ios.auth",
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
@@ -57,7 +57,7 @@ public class KeychainService: KeychainServiceProtocol {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.mosal.Authentication",
+            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "app.photocards.ios.auth",
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -80,7 +80,7 @@ public class KeychainService: KeychainServiceProtocol {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.mosal.Authentication"
+            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "app.photocards.ios.auth"
         ]
         
         let status = SecItemDelete(query as CFDictionary)
