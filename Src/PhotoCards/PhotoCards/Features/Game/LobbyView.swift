@@ -11,6 +11,8 @@ struct LobbyView: View {
     let state: GameState
     let onEditSettings: () -> Void
 
+    @State private var showDetails = false
+
     private var canStart: Bool { state.players.count >= 3 }
 
     private var shareText: String {
@@ -20,28 +22,27 @@ struct LobbyView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 18) {
+                VStack(spacing: 22) {
                     codeCard
                     playersCard
                     settingsCard
-                    Color.clear.frame(height: 120)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
             }
         }
-        .overlay(alignment: .bottom) { footer }
+        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
     }
 
     private var codeCard: some View {
-        VStack(spacing: 12) {
-            Text("Room code")
-                .font(Font.poppins(.semiBold, size: 13))
-                .foregroundColor(.white.opacity(0.7))
-            RoomCodeChip(code: state.game.roomCode, large: true)
-            Text("Share it with friends so they can join.")
+        VStack(spacing: 10) {
+            Text("Invite your crew")
+                .font(Font.poppins(.bold, size: 24))
+                .foregroundColor(.white)
+            Text("Share the code. Get everyone in.")
                 .font(Font.poppins(.regular, size: 13))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundStyle(.white.opacity(0.65))
+            RoomCodeChip(code: state.game.roomCode, large: true)
             HStack(spacing: 12) {
                 ShareLink(item: shareText) {
                     Label("Share", systemImage: "square.and.arrow.up")
@@ -58,14 +59,7 @@ struct LobbyView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: PC.cornerLarge, style: .continuous)
-                .fill(Color.white.opacity(0.12))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: PC.cornerLarge, style: .continuous)
-                .stroke(Color.white.opacity(0.22), lineWidth: 1)
-        )
+
     }
 
     private var playersCard: some View {
@@ -85,7 +79,7 @@ struct LobbyView: View {
                         }
                     }
                     if !canStart {
-                        Text("Need \(3 - state.players.count) more to start (minimum 3).")
+                        Text("Waiting for \(3 - state.players.count) more players")
                             .font(Font.poppins(.regular, size: 13))
                             .foregroundColor(.white.opacity(0.7))
                             .padding(12)
@@ -107,11 +101,31 @@ struct LobbyView: View {
             }
             SurfaceCard {
                 VStack(alignment: .leading, spacing: 10) {
-                    settingRow(icon: state.game.mode.icon, title: state.game.mode.title, detail: state.game.mode.subtitle)
-                    settingRow(icon: "flag.checkered", title: "\(state.game.maxRounds) rounds", detail: "First to \(state.game.targetScore) points wins early")
-                    settingRow(icon: "timer", title: "\(state.game.roundTimerSeconds)s per round", detail: "\(state.game.handSize) photos in hand, \(state.game.refreshesPerPlayer) refreshes")
-                    settingRow(icon: "text.quote", title: state.game.promptPacks.joined(separator: ", "), detail: state.game.customPromptCount > 0 ? "+ \(state.game.customPromptCount) custom prompts" : "Prompt packs")
-                    settingRow(icon: state.game.isPublic ? "globe" : "lock.fill", title: state.game.isPublic ? "Public room" : "Private room", detail: state.game.isPublic ? "Listed under Browse" : "Only people with the code")
+                    VStack(spacing: 6) {
+                        Label(state.game.mode.title, systemImage: state.game.mode.icon)
+                            .font(Font.poppins(.semiBold, size: 18))
+                        Text(state.game.mode.subtitle)
+                            .font(Font.poppins(.regular, size: 12))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    Text("\(state.game.maxRounds) rounds · \(state.game.roundTimerSeconds)s · \(state.game.isPublic ? "Public" : "Private")")
+                        .font(Font.poppins(.regular, size: 13))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .frame(maxWidth: .infinity)
+                    DisclosureGroup("Details", isExpanded: $showDetails) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            settingRow(icon: "flag.checkered", title: "\(state.game.maxRounds) rounds", detail: "First to \(state.game.targetScore) points wins early")
+                            settingRow(icon: "timer", title: "\(state.game.roundTimerSeconds)s per round", detail: "\(state.game.handSize) photos in hand, \(state.game.refreshesPerPlayer) refreshes")
+                            settingRow(icon: "text.quote", title: state.game.promptPacks.joined(separator: ", "), detail: state.game.customPromptCount > 0 ? "+ \(state.game.customPromptCount) custom prompts" : "Prompt packs")
+                            settingRow(icon: state.game.isPublic ? "globe" : "lock.fill", title: state.game.isPublic ? "Public room" : "Private room", detail: state.game.isPublic ? "Listed under Browse" : "Only people with the code")
+                        }
+                        .padding(.top, 8)
+                    }
+                    .font(Font.poppins(.medium, size: 13))
+                    .tint(.white)
+                    .foregroundStyle(.white)
                 }
             }
         }

@@ -41,13 +41,39 @@ struct GameSessionView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .confirmationDialog("Leave this game?", isPresented: $showLeaveConfirm, titleVisibility: .visible) {
-            Button("Leave game", role: .destructive) {
-                Task { await session.leaveGame() }
+        .sheet(isPresented: $showLeaveConfirm) {
+            VStack(spacing: 18) {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(PC.red)
+                    .frame(width: 70, height: 70)
+                    .background(PC.red.opacity(0.15), in: Circle())
+                Text("Leave this room?")
+                    .font(Font.poppins(.bold, size: 24))
+                Text(leaveMessage)
+                    .font(Font.poppins(.regular, size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                VStack(spacing: 10) {
+                    Button("Stay in game") { showLeaveConfirm = false }
+                        .buttonStyle(PillButtonStyle())
+                    Button {
+                        showLeaveConfirm = false
+                        Task { await session.leaveGame() }
+                    } label: {
+                        Text("Leave room")
+                    }
+                    .buttonStyle(SecondaryPillButtonStyle(height: 48))
+                    .disabled(session.isBusy)
+                }
             }
-            Button("Stay", role: .cancel) {}
-        } message: {
-            Text(leaveMessage)
+            .foregroundStyle(.white)
+            .padding(24)
+            .presentationDetents([.height(390)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(32)
+            .presentationBackground { PhotoBackdrop(imageURL: nil) }
         }
         .sheet(isPresented: $showSettingsEditor) {
             if let state = session.state {
@@ -91,7 +117,11 @@ struct GameSessionView: View {
 
             Spacer()
 
-            if state.game.phase == .lobby || state.game.phase == .gameOver {
+            if state.game.phase == .lobby {
+                Text("Your room")
+                    .font(Font.poppins(.semiBold, size: 16))
+                    .foregroundStyle(.white)
+            } else if state.game.phase == .gameOver {
                 RoomCodeChip(code: state.game.roomCode)
             } else {
                 Text("Round \(state.game.currentRound) of \(state.game.maxRounds)")

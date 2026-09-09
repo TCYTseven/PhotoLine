@@ -304,3 +304,19 @@ struct DarkSectionHeader: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+// Shared styling for utility screens, including their nested lists.
+struct GameListStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(.hidden)
+            .listStyle(.insetGrouped)
+            .background { PhotoBackdrop(imageURL: nil) }
+            .font(Font.poppins(.regular, size: 14))
+            .foregroundStyle(.white)
+            .tint(.white)
+            .preferredColorScheme(.dark)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
+    }
+}

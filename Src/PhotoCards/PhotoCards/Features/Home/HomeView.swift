@@ -27,12 +27,12 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 topBar
                 Spacer(minLength: 8)
-                LogoFanView(scale: 0.95)
-                Spacer(minLength: 16)
+                LogoFanView(scale: 0.75)
+                Spacer(minLength: 8)
                 nameField
                     .padding(.bottom, 14)
                 mainButtons
-                Spacer(minLength: 16)
+                Spacer(minLength: 8)
                 bottomRow
                 legalFooter
             }

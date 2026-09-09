@@ -15,8 +15,10 @@ struct CreateGameView: View {
     @AppStorage(AppStorageKeys.playerName) private var playerName = ""
     @Injected(\.gameService) private var gameService: GameService
 
+    @AppStorage(AppStorageKeys.selectedPromptPacks) private var selectedPacks = "party-mix"
     @State private var settings: GameSettings
     @State private var packs: [PromptPack] = []
+    @State private var showAdvanced = false
     private let editing: GameState?
     private let onSaved: (() -> Void)?
 
@@ -51,27 +53,41 @@ struct CreateGameView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 18) {
                     modeSection
-                    rulesSection
-                    packsSection
-                    customPromptsSection
-                    Color.clear.frame(height: 90)
+                    DisclosureGroup(isExpanded: $showAdvanced) {
+                        VStack(spacing: 16) {
+                            rulesSection
+                            packsSection
+                            customPromptsSection
+                        }
+                        .padding(.top, 14)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Advanced")
+                                .font(Font.poppins(.semiBold, size: 16))
+                            Text("Rules, prompt packs & room visibility")
+                                .font(Font.poppins(.regular, size: 12))
+                                .foregroundStyle(.white.opacity(0.65))
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .tint(.white)
+                    .foregroundStyle(.white)
+                    .padding(14)
+                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 12)
             }
             .scrollDismissesKeyboard(.interactively)
 
-            VStack {
-                Spacer()
-                createButton
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 12)
-                    .background(
-                        LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                            .ignoresSafeArea()
-                    )
-            }
         }
+        .safeAreaInset(edge: .bottom) {
+            createButton
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+        }
+
         .navigationTitle(isEditing ? "Game settings" : "Create game")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -352,6 +368,7 @@ struct CreateGameView: View {
 
     private func togglePack(_ pack: PromptPack) {
         if let index = settings.packSlugs.firstIndex(of: pack.slug) {
+            guard settings.packSlugs.count > 1 else { return }
             settings.packSlugs.remove(at: index)
         } else {
             settings.packSlugs.append(pack.slug)
@@ -363,7 +380,11 @@ struct CreateGameView: View {
             let loaded = try await gameService.listPromptPacks()
             packs = loaded
             if settings.packSlugs.isEmpty && !isEditing {
-                settings.packSlugs = loaded.filter { $0.isDefault }.map { $0.slug }
+                let saved = selectedPacks.split(separator: ",").map(String.init)
+                settings.packSlugs = loaded.filter { saved.contains($0.slug) }.map { $0.slug }
+                if settings.packSlugs.isEmpty {
+                    settings.packSlugs = loaded.filter { $0.isDefault }.map { $0.slug }
+                }
             }
         } catch {
             packsFailed = true
@@ -381,6 +402,7 @@ struct CreateGameView: View {
         }
         let name = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
         if await session.createGame(username: name, settings: settings) {
+            selectedPacks = settings.packSlugs.joined(separator: ",")
             PC.notify(.success)
             navigator.popToRoot()
         }

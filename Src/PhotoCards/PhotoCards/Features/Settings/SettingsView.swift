@@ -29,6 +29,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Group {
             Section {
                 TextField("Your name", text: $playerName)
                     .textInputAutocapitalization(.words)
@@ -46,10 +47,6 @@ struct SettingsView: View {
                 Text("Display name")
             } footer: {
                 Text("Shown to other players in your rooms. You play as a guest; no email or password needed.")
-            }
-
-            Section("Appearance") {
-                Toggle("Dark mode", isOn: $isDarkMode)
             }
 
             Section("Help") {
@@ -118,10 +115,14 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
             }
+            }
+            .listRowBackground(Color.white.opacity(0.10))
+            .listRowSeparatorTint(.white.opacity(0.12))
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(PC.red)
+        .modifier(GameListStyle())
+        .tint(.white)
         .sheet(item: $webPage) { page in
             SafariView(url: page.url).ignoresSafeArea()
         }
@@ -173,6 +174,7 @@ struct BlockedUsersView: View {
 
     var body: some View {
         List {
+            Group {
             if isLoading {
                 HStack { Spacer(); ProgressView(); Spacer() }
             } else if users.isEmpty {
@@ -204,9 +206,13 @@ struct BlockedUsersView: View {
             if let errorMessage {
                 Text(errorMessage).font(.footnote).foregroundColor(.red)
             }
+            }
+            .listRowBackground(Color.white.opacity(0.10))
+            .listRowSeparatorTint(.white.opacity(0.12))
         }
         .navigationTitle("Blocked players")
         .navigationBarTitleDisplayMode(.inline)
+        .modifier(GameListStyle())
         .task { await load() }
         .refreshable { await load() }
     }

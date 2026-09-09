@@ -36,7 +36,8 @@ struct BrowseGamesView: View {
                 }
             }
         }
-        .navigationTitle("Public rooms")
+        .navigationTitle("Browse")
+        .preferredColorScheme(.dark)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -69,7 +70,9 @@ struct BrowseGamesView: View {
                             if joiningCode == game.roomCode {
                                 ProgressView().tint(.white)
                             } else {
-                                RoomCodeChip(code: game.roomCode)
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 26))
+                                    .foregroundStyle(.white.opacity(0.8))
                             }
                         }
                         .padding(14)
@@ -98,7 +101,9 @@ struct BrowseGamesView: View {
     private func emptyState(icon: String, title: String, message: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 44))
+                .font(.system(size: 32, weight: .semibold))
+                .frame(width: 76, height: 76)
+                .background(PC.red.opacity(0.2), in: RoundedRectangle(cornerRadius: 24))
                 .foregroundColor(.white.opacity(0.8))
             Text(title)
                 .font(Font.poppins(.bold, size: 18))
@@ -107,12 +112,21 @@ struct BrowseGamesView: View {
                 .font(Font.poppins(.regular, size: 14))
                 .foregroundColor(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
-            Button("Try again") { Task { await load() } }
+            if loadError == nil {
+                Button("Create a room") { navigator.navigate(to: .createGame) }
+                    .buttonStyle(PillButtonStyle())
+                Button("Join with a code") { navigator.navigate(to: .joinGame(code: nil)) }
+                    .buttonStyle(SecondaryPillButtonStyle(height: 48))
+            }
+            Button(loadError == nil ? "Refresh rooms" : "Try again") { Task { await load() } }
                 .buttonStyle(SecondaryPillButtonStyle(height: 44))
                 .frame(width: 160)
                 .padding(.top, 6)
         }
-        .padding(30)
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 28))
+        .padding(18)
     }
 
     private func load() async {
