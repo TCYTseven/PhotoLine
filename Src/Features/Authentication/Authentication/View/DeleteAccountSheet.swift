@@ -32,7 +32,7 @@ public struct DeleteAccountSheet: View {
                 .padding(.horizontal)
 
             if let error {
-                Text(error.localizedDescription)
+                Text(message(for: error))
                     .font(Theme.Typography.caption)
                     .foregroundColor(.red)
                     .padding(.horizontal)
@@ -80,6 +80,15 @@ public struct DeleteAccountSheet: View {
         .presentationDetents([.height(340)])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
+    }
+
+    /// AuthError is not a LocalizedError, so `localizedDescription` would
+    /// show "The operation couldn't be completed (Authentication.AuthError …)".
+    private func message(for error: Error) -> String {
+        if let authError = error as? AuthError, case .networkError = authError {
+            return "Couldn't reach the server. Check your connection and try again."
+        }
+        return "Your account couldn't be deleted. Please try again in a moment."
     }
 
     private func deleteAccount() {

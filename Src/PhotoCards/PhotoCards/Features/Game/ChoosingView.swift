@@ -11,12 +11,16 @@ import Common
 
 struct ChoosingView: View {
     @EnvironmentObject private var session: GameSessionStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let state: GameState
 
     @State private var selected: HandCard?
     @State private var showRefreshConfirm = false
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+
+    /// The timer ran out but the server hasn't moved the round on yet.
+    private var timeUp: Bool { session.secondsRemaining == 0 }
 
     var body: some View {
         ZStack {
@@ -38,31 +42,23 @@ struct ChoosingView: View {
                 handScreen
             }
 
-            if let card = selected {
+            if let card = selected, !state.me.hasSubmitted, !state.me.isJudge {
                 PhotoDetailOverlay(
                     imageURL: card.imageUrl,
                     prompt: state.round?.promptText,
-                    primaryTitle: "Submit this photo",
-                    primaryIcon: "paperplane.fill",
+                    primaryTitle: timeUp ? "Time's up" : "Submit this photo",
+                    primaryIcon: timeUp ? "clock.badge.xmark" : "paperplane.fill",
                     isBusy: session.isBusy,
-                    onPrimary: {
-                        Task {
-                            if await session.submitPhoto(photoId: card.photoId) {
-                                PC.notify(.success)
-                            }
-                            selected = nil
-                        }
-                    },
+                    onPrimary: submitAction(for: card),
                     onClose: { selected = nil },
-                    reportUserId: nil,
                     reportPhotoId: card.photoId
                 )
                 .transition(.opacity)
                 .zIndex(2)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: selected?.id)
-        .confirmationDialog("Swap your whole hand for 16 new photos?", isPresented: $showRefreshConfirm, titleVisibility: .visible) {
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: selected?.id)
+        .confirmationDialog("Swap your whole hand for new photos?", isPresented: $showRefreshConfirm, titleVisibility: .visible) {
             Button("Refresh hand") {
                 Task {
                     if await session.refreshHand() { PC.haptic(.medium) }
@@ -75,69 +71,100 @@ struct ChoosingView: View {
     }
 
     private var handScreen: some View {
-        VStack(spacing: 0) {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 14) {
-                    if let round = state.round {
-                        PromptCard(text: round.promptText, caption: judgeCaption(round))
-                            .padding(.horizontal, 18)
-                            .padding(.top, 4)
-                    }
-
-                    HStack {
-                        Text("Pick the photo that fits best")
-                            .font(Font.poppins(.semiBold, size: 14))
-                            .foregroundColor(.white.opacity(0.85))
-                        Spacer()
-                        Button {
-                            showRefreshConfirm = true
-                        } label: {
-                            Label("Refresh (\(state.refreshesLeft))", systemImage: "arrow.triangle.2.circlepath")
-                                .font(Font.poppins(.semiBold, size: 13))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(Color.white.opacity(0.18)))
-                        }
-                        .disabled(state.refreshesLeft == 0 || session.isBusy)
-                        .opacity(state.refreshesLeft == 0 ? 0.5 : 1)
-                    }
-                    .padding(.horizontal, 18)
-
-                    if state.hand.isEmpty {
-                        VStack(spacing: 10) {
-                            ProgressView().tint(.white)
-                            Text("Dealing your photos…")
-                                .font(Font.poppins(.regular, size: 14))
-                                .foregroundColor(.white.opacity(0.75))
-                        }
-                        .padding(.top, 40)
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 8) {
-                            ForEach(state.hand) { card in
-                                Button {
-                                    PC.haptic()
-                                    selected = card
-                                } label: {
-                                    PhotoTile(url: card.thumbnailUrl, selected: selected?.id == card.id)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Photo \(card.position)")
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                    }
-                    Color.clear.frame(height: 24)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 14) {
+                if let round = state.round {
+                    ReportablePromptCard(state: state, round: round, caption: judgeCaption(round))
+                        .padding(.horizontal, 18)
+                        .padding(.top, 4)
                 }
+
+                if timeUp {
+                    Label("Time's up! Moving on…", systemImage: "clock.badge.xmark")
+                        .font(Font.poppins(.semiBold, size: 14))
+                        .foregroundColor(.yellow)
+                        .padding(.horizontal, 18)
+                }
+
+                HStack(spacing: 8) {
+                    Text("Pick the photo that fits best")
+                        .font(Font.poppins(.semiBold, size: 14))
+                        .foregroundColor(.white.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 4)
+                    Button {
+                        showRefreshConfirm = true
+                    } label: {
+                        Label("Refresh (\(state.refreshesLeft))", systemImage: "arrow.triangle.2.circlepath")
+                            .font(Font.poppins(.semiBold, size: 13))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.white.opacity(0.18)))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(state.refreshesLeft == 0 || session.isBusy || timeUp || state.hand.isEmpty)
+                    .opacity(state.refreshesLeft == 0 || timeUp ? 0.5 : 1)
+                    .accessibilityLabel("Refresh hand")
+                    .accessibilityValue("\(state.refreshesLeft) left")
+                }
+                .padding(.horizontal, 18)
+
+                if state.hand.isEmpty {
+                    VStack(spacing: 10) {
+                        ProgressView().tint(.white)
+                        Text("Dealing your photos…")
+                            .font(Font.poppins(.regular, size: 14))
+                            .foregroundColor(.white.opacity(0.75))
+                    }
+                    .padding(.top, 40)
+                    .accessibilityElement(children: .combine)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 8) {
+                        ForEach(Array(state.hand.enumerated()), id: \.element.id) { index, card in
+                            Button {
+                                PC.haptic()
+                                selected = card
+                            } label: {
+                                PhotoTile(url: card.thumbnailUrl, selected: selected?.id == card.id)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Photo \(index + 1) of \(state.hand.count)")
+                            .accessibilityHint("Opens a larger preview")
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                }
+                Color.clear.frame(height: 24)
+            }
+        }
+    }
+
+    private func submitAction(for card: HandCard) -> (() -> Void)? {
+        guard !timeUp else { return nil }
+        return {
+            Task {
+                if await session.submitPhoto(photoId: card.photoId) {
+                    PC.notify(.success)
+                }
+                selected = nil
             }
         }
     }
 
     private func judgeCaption(_ round: RoundInfo) -> String {
-        if state.isVoteMode { return "Everyone votes this round" }
-        if let judge = round.judgeUsername { return "\(judge) is judging" }
-        return "PhotoCards"
+        roundCaption(state: state, round: round)
     }
+}
+
+/// "Alex is judging" / "Everyone votes this round".
+func roundCaption(state: GameState, round: RoundInfo) -> String {
+    if state.isVoteMode { return "Everyone votes this round" }
+    if state.me.isJudge { return "You're judging" }
+    if let judge = round.judgeUsername { return "\(judge) is judging" }
+    return "PhotoCards"
 }
 
 // MARK: - Waiting screen (judge waiting / already submitted)
@@ -155,7 +182,7 @@ struct WaitingView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
                 if let round = state.round {
-                    PromptCard(text: round.promptText, caption: state.isVoteMode ? "Everyone votes this round" : (round.judgeUsername.map { "\($0) is judging" } ?? "PhotoCards"))
+                    ReportablePromptCard(state: state, round: round, caption: roundCaption(state: state, round: round))
                         .padding(.horizontal, 18)
                         .padding(.top, 4)
                 }
@@ -167,15 +194,19 @@ struct WaitingView: View {
                         .frame(width: 84, height: 84)
                         .background(Circle().fill(PC.red))
                         .shadow(color: PC.red.opacity(0.5), radius: 14)
+                        .accessibilityHidden(true)
                     Text(title)
                         .font(Font.poppins(.bold, size: 24))
                         .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
                     Text(subtitle)
                         .font(Font.poppins(.regular, size: 14))
                         .foregroundColor(.white.opacity(0.75))
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 30)
-                    Text("\(submitted) of \(expected) photos in")
+                    Text("\(submitted) of \(expected) photo\(expected == 1 ? "" : "s") in")
                         .font(Font.poppins(.semiBold, size: 14))
                         .monospacedDigit()
                         .foregroundColor(.white)

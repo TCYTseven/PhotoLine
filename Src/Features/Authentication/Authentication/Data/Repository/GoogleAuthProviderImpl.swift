@@ -23,6 +23,17 @@ class GoogleAuthProviderImpl: GoogleAuthProvider {
     }
     
     func authenticate() async throws -> AuthModel.GoogleAuthResult {
+        // Google Sign-In is not configured for PhotoCards (guest-only). Without
+        // a real client ID (and its URL scheme in Info.plist) the SDK raises an
+        // Objective-C exception, so refuse up front instead of crashing.
+        guard !clientID.isEmpty, !clientID.hasPrefix("YOUR_") else {
+            throw AuthError.authProviderError(NSError(
+                domain: "GoogleAuthProvider",
+                code: -2,
+                userInfo: [NSLocalizedDescriptionKey: "Google Sign-In is not configured"]
+            ))
+        }
+
         return try await withCheckedThrowingContinuation { continuation in
             // Ensure we're on the main thread for UI operations
             DispatchQueue.main.async {

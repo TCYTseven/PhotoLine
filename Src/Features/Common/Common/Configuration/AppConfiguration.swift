@@ -3,18 +3,15 @@
 //  Common
 //
 //  Central configuration file for the app.
-//  Fill in your service credentials before building.
 //
-//  Required setup:
-//  - Supabase: https://supabase.com/dashboard/project/_/settings/api
-//  - Google OAuth: https://console.cloud.google.com/apis/credentials
-//  - RevenueCat: https://app.revenuecat.com/
+//  PhotoCards only talks to Supabase (guest / anonymous auth, RPCs and
+//  Realtime). The Google, RevenueCat and API sections below belong to optional
+//  starter modules the app does not use; they are intentionally empty.
 //
 
 import Foundation
 
 /// Central configuration for the app
-/// Fill in your values before building
 public enum AppConfiguration {
 
     // MARK: - Environment
@@ -50,25 +47,21 @@ public enum AppConfiguration {
     }
 
     // MARK: - Google Sign-In
-    // Get this from: https://console.cloud.google.com/apis/credentials
-    // Note: Also update GIDClientID in Info.plist with this value
+    // Not used: PhotoCards has no social sign-in. Empty disables the provider
+    // (GoogleAuthProviderImpl refuses to start without a client ID).
 
     public enum Google {
-        /// Your Google OAuth Client ID
-        public static let clientID = "YOUR_GOOGLE_CLIENT_ID"
+        /// Google OAuth Client ID (unused)
+        public static let clientID = ""
     }
 
     // MARK: - RevenueCat
-    // Get these from: https://app.revenuecat.com/
+    // Not used: PhotoCards has no in-app purchases. The Subscription module
+    // is not imported by the app.
 
     public enum RevenueCat {
-        #if DEBUG
-        /// Your RevenueCat API key (Debug/Sandbox)
-        public static let apiKey = "YOUR_REVENUECAT_API_KEY"
-        #else
-        /// Your RevenueCat API key (Production)
-        public static let apiKey = "YOUR_REVENUECAT_API_KEY"
-        #endif
+        /// RevenueCat API key (unused)
+        public static let apiKey = ""
 
         /// Your RevenueCat entitlement identifier
         /// This is configured in RevenueCat dashboard under Project > Entitlements
@@ -88,16 +81,12 @@ public enum AppConfiguration {
     }
 
     // MARK: - API
-    // Your backend API configuration
+    // Not used: there is no custom backend besides Supabase (HTTPNetworking
+    // has no callers).
 
     public enum API {
-        #if DEBUG
-        /// API base URL for development
-        public static let baseURL = "http://localhost:8080"
-        #else
-        /// API base URL for production
-        public static let baseURL = "https://api.yourapp.com"
-        #endif
+        /// REST API base URL (unused)
+        public static let baseURL = ""
     }
 
     // MARK: - App Info
@@ -151,8 +140,9 @@ public enum AppConfiguration {
             "https://tcytseven.github.io/PhotoLine/join/?code=\(code)"
         }
 
-        /// App Store ID (numeric ID from App Store Connect). Only used by the
-        /// update checker; leave empty until the app is listed.
+        /// App Store ID (numeric ID from App Store Connect). Only a fallback
+        /// for the update checker, which prefers the store URL returned by the
+        /// iTunes lookup; fill in once the app is listed.
         public static let appStoreID = ""
     }
 }

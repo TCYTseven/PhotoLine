@@ -77,8 +77,7 @@ class AuthenticationViewModel {
             
             await MainActor.run {
                 authState = .success(token)
-                // Emit login event
-                eventViewModel.emit(.userLoggedIn)
+                // The repository already emitted .userLoggedIn.
                 self.authMethod = .none  // Reset auth method
                 completion(true)
             }
@@ -106,15 +105,14 @@ class AuthenticationViewModel {
                 
                 await MainActor.run {
                     authState = .notInitiated
-                    // Emit logout event
-                    eventViewModel.emit(.userLoggedOut)
+                    // The repository already emitted .userLoggedOut.
                     completion()
                 }
             } catch {
-                // Even if there's an error with the remote logout, we still want to consider the user logged out locally
+                // The repository finishes the local logout (and emits) even
+                // when the server call fails.
                 await MainActor.run {
                     authState = .notInitiated
-                    eventViewModel.emit(.userLoggedOut)
                     completion()
                 }
             }
@@ -128,8 +126,8 @@ class AuthenticationViewModel {
             
             await MainActor.run {
                 authState = .notInitiated
-                // Emit user deleted event
-                eventViewModel.emit(.userLoggedOut)
+                // The repository already emitted .userLoggedOut; emitting
+                // again would start a second concurrent guest sign-in.
             }
         } catch let error as AuthError {
             await MainActor.run {
