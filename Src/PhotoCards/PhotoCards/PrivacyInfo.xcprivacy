@@ -64,7 +64,8 @@
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
-			<!-- @AppStorage / UserDefaults: player name, dark mode, onboarding flag -->
+			<!-- @AppStorage / UserDefaults: player name, dark mode, tutorial flag,
+			     selected prompt packs, review-prompt counters. App-only data. -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
@@ -73,7 +74,9 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- Image cache (Nuke) inspects file modification dates -->
+			<!-- Not called by PhotoCards' own code. Declared for statically linked
+			     SDK code (Nuke's disk cache) that reads file dates inside the
+			     app container. -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
@@ -82,7 +85,8 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- Image cache size management -->
+			<!-- Not called by PhotoCards' own code. Declared for statically linked
+			     SDK code (image disk cache) that checks free space before writing. -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
@@ -91,7 +95,8 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- Network / websocket libraries measure elapsed time -->
+			<!-- Not called by PhotoCards' own code. Declared for statically linked
+			     SDK code (Supabase realtime / networking) that measures elapsed time. -->
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>

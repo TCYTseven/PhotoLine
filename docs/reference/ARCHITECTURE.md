@@ -54,4 +54,4 @@ RootView
 
 ## Frameworks from the starter kit
 
-`Common` (theme, config), `Authentication` (Supabase client, guest / Apple / Google sign-in, account deletion sheet) and `Events` are used. `Repositories`, `FileHandler` and `Subscription` are built and linked but unused by the game; remove them from the workspace if you don't plan to use them.
+`Common` (theme, config), `Authentication` (Supabase client, guest / Apple / Google sign-in, account deletion sheet) and `Events` are used. `Repositories`, `FileHandler` and `Subscription` remain in `Src/Features/` as starter-kit code but are **not** in `PhotoCards.xcworkspace` and are not linked or embedded in the app, so RevenueCat is neither resolved nor shipped. To use one, add its `.xcodeproj` back to the workspace and link it to the app target.

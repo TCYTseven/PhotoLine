@@ -1,112 +1,183 @@
-# App Store / Google Play Compliance Audit
+# App Store Compliance Audit
 
-**Scope**: the whole repository as of this branch. **Role**: release manager acting as a strict App Store / Play reviewer.
-**Platform note**: this repository contains an **iOS app only**. There is no Android project, so no `AndroidManifest.xml` exists to audit; Google Play items are covered by the shared web pages (privacy policy, terms, support) and data-deletion flow, which Play's Data Safety form also requires.
+**Scope**: the whole repository. **Role**: release manager acting as a strict App Review reviewer.
+**Last verified**: 24 September 2026, against the code rather than the previous version of this file.
+**Platform**: iOS only (iPhone). There is no Android project; Google Play items are out of scope.
 
-Legend: ✅ compliant · 🔧 fixed in this branch · ⚠️ action needed by you before submission
+Legend: ✅ verified compliant · 🔧 fixed on this branch · ⚠️ action needed before submission
+
+The first pass (commit `3e64b5e`) got most of the product-level work right. The second pass found that several of its claims were not true in the code or the project file; those are called out as **Correction** below.
 
 ---
 
-## 1. Account deletion (Guideline 5.1.1(v))
+## 1. Build settings (`Src/PhotoCards/PhotoCards.xcodeproj`)
 
-| Check | Status | Where |
-|-------|--------|-------|
-| Does the app create accounts? | Yes: anonymous guest accounts via Supabase | `RootViewModel.bootstrap()` |
-| In-app deletion, easy to find | 🔧 **Settings → Account → Delete account & data**, with a confirmation dialog and a clear description of what is removed | `Features/Settings/SettingsView.swift` |
-| Deletes server-side data, not just sign-out | 🔧 `delete_my_account()` deletes the `auth.users` row; every table cascades (profile, players, submissions, votes, reports, blocks) | `supabase/schema.sql` §6, `AuthRemoteDataSourceImpl.deleteAccount` |
-| Local data wiped too | 🔧 Keychain session cleared, display name reset, session cleared; a new guest is created | `RootView.onChange(accountDeletionCount)` |
-| Web instructions | 🔧 Privacy policy and support page describe the in-app path | `web/privacy/`, `web/support/` |
+| Setting | Value | Status |
+|---------|-------|--------|
+| Bundle ID | `app.photocards.ios` (tests `.tests` / `.uitests`) | ⚠️ replace with an identifier you own, then register it |
+| `DEVELOPMENT_TEAM` | not set | ⚠️ select your team in Xcode |
+| `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` | `1.0` / `1` on every target | ✅ bump the build number for every upload |
+| `IPHONEOS_DEPLOYMENT_TARGET` | Was **18.1** at project level and on the test targets but **18** on the app. | 🔧 `18.0` everywhere in the app project (the feature frameworks' targets are already 18) |
+| `TARGETED_DEVICE_FAMILY` | `1` (iPhone) | ✅ app; 🔧 test targets were `1,2` |
+| Orientations | Portrait on iPhone. The project also set `UISupportedInterfaceOrientations_iPad` (all four) even though the app does not target iPad | 🔧 iPad key removed. `UIRequiresFullScreen` is not needed because there is no iPad target |
+| Swift | `SWIFT_VERSION = 5.0` (Swift 5 language mode on the current toolchain) | ✅ |
+| Required device capabilities | none declared (arm64 is implicit) | ✅ |
+| Display name / category | `PhotoCards`, `public.app-category.games` | ✅ |
+| Launch screen | `UILaunchScreen` → `LaunchBackground` colour (asset exists) | ✅ |
+| `ITSAppUsesNonExemptEncryption` | `false`: HTTPS only. The CryptoKit SHA-256 in `Authentication` is hashing, which is exempt | ✅ |
+| Mac / visionOS "Designed for iPhone" | disabled | ✅ |
+| Linked frameworks | App linked **and embedded** `Subscription` (which bundles RevenueCat + RevenueCatUI), `FileHandler`, `Repositories` and `VideoSubscriberAccount`, and imports none of them. There were also 24 stale file references (`FirebaseSdkContainer`, `GoogleSigninLib`, `KFImageContainer`, …) | 🔧 unlinked/unembedded; stale references removed (every removed ID checked to have no remaining reference, and the file re-parsed). `Repositories`, `FileHandler` and `Subscription` were also dropped from `PhotoCards.xcworkspace`, and the `purchases-ios` pin was removed from the workspace `Package.resolved`. The app now links `Common`, `Authentication`, `Events` + Supabase, NukeUI, Factory. **Correction**: the first pass said RevenueCat was "unused". It was unused but still shipped, with a privacy manifest that declares *Purchase History* |
 
-Before: the starter kit called a `delete-user` Edge Function that does not exist in this repo (would fail at runtime), and the button lived on a "Settings Coming Soon" placeholder.
+## 2. Entitlements & capabilities
 
-## 2. Privacy policy & terms (5.1.1, 1.2, Play Policy Center)
+| Check | Status |
+|-------|--------|
+| `com.apple.developer.applesignin` was in `PhotoCards.entitlements` | 🔧 removed; the file is now an empty dict. Nothing presents `AuthenticationSheet`/`AuthenticationPage`: the app calls only `signInAnonymously()` (`RootViewModel`) and `deleteAccountSheet()` (`RootView`). The `ASAuthorization` and `GIDSignIn` code in `Features/Authentication` can't be reached |
+| Push, IAP, background modes, App Groups, associated domains | none | ✅ |
+| 4.8 Sign in with Apple | not required: no third-party or social login is offered | ✅ |
+| Setup docs told you to enable Sign in with Apple, Push and IAP | 🔧 `docs/setup/APPLE_DEVELOPER.md`, `XCODE_CONFIG.md` rewritten: no capabilities |
 
-| Check | Status | Where |
-|-------|--------|-------|
-| Privacy policy accessible in-app | 🔧 Settings → Legal → Privacy Policy (in-app Safari) and a footer link on the Home screen | `SettingsView`, `HomeView.legalFooter` |
-| Terms accessible in-app | 🔧 Settings → Legal → Terms of Service, Home footer | same |
-| Live web pages | 🔧 `web/privacy/`, `web/terms/`, `web/support/`, `web/licenses/` deployed by `.github/workflows/pages.yml` to `https://tcytseven.github.io/PhotoLine/…` | `web/`, `AppConfiguration.App` |
-| Policy content matches actual data practices | 🔧 Written for this app: guest ID, display name, gameplay, custom prompts, reports; no camera roll, no tracking, retention and deletion described | `web/privacy/index.html` |
-| Support URL for App Store Connect | 🔧 `/support/` with FAQ and a real contact channel (GitHub issues) | `web/support/` |
+## 3. App icon (`Assets.xcassets/AppIcon.appiconset`)
 
-Before: links pointed at `iosjumpstart.com` and `yourapp.com` placeholders; "Contact Us" opened a mail composer to `support@iosjumpstart.com`; the auth page's "Terms / Privacy" text was not tappable.
+| Check | Status |
+|-------|--------|
+| Every PNG: RGB (no alpha channel), 8-bit, sRGB, pixel size equal to its slot | ✅ checked with Pillow (all 19 files) |
+| 1024 px marketing icon: opaque, full-bleed square, no pre-rounded corners | ✅ |
+| `Contents.json` was an icon-generator export (no `info` block, non-standard keys, iPad and legacy iOS 6 slots in an iPhone-only iOS 18 app) | 🔧 replaced with Xcode's single-size format (one universal 1024 × 1024 image). Xcode generates every size from it. The 18 derived PNGs were deleted |
 
-⚠️ **You**: enable GitHub Pages (Settings → Pages → Source: GitHub Actions) or host `web/` elsewhere and update the URLs. Add the same URLs to App Store Connect.
+## 4. Swift packages
 
-## 3. Permissions & usage strings (5.1.1(i))
+| Check | Status |
+|-------|--------|
+| Every `XCRemoteSwiftPackageReference` in the workspace's projects (app, Common, Events, Authentication: Factory, Nuke, supabase-swift, GoogleSignIn-iOS) is pinned in `PhotoCards.xcworkspace/xcshareddata/swiftpm/Package.resolved`, together with its transitive dependencies (AppAuth, GTMAppAuth, gtm-session-fetcher, GoogleUtilities, app-check, promises, swift-crypto/asn1/http-types, pointfree libraries) | ✅ nothing is missing or dangling |
+| The last commit removed 92 lines from the workspace `Package.resolved` | ✅ they were the Firebase dependency tree (firebase-ios-sdk, GoogleAppMeasurement, abseil, gRPC, leveldb, nanopb, swift-protobuf, …), which nothing references any more |
+| `Src/PhotoCards/PhotoCards.xcodeproj/project.xcworkspace/.../Package.resolved` still pinned Firebase and a different gtm-session-fetcher major | 🔧 deleted. The workspace file is the only source of truth (CI and the docs both use the workspace) |
+| `Features/Authentication` statically bundles **GoogleSignIn 9**. Its privacy manifest declares Name, Email, Phone, Coarse Location, User ID, Device ID and Other Usage Data (some for Analytics). The app never initialises it, but Xcode's privacy report aggregates it, and it contradicts the App Privacy answers below | ⚠️ **Swift change**: remove `GoogleAuthProviderImpl.swift`, the Google path in `AuthRepository`/`AuthenticationViewModel`, and the GoogleSignIn package from `Authentication.xcodeproj`. The same goes for the unreachable Apple sign-in path. Until then, `web/licenses/` credits the Google libraries |
 
-| Permission | Used? | Status |
-|------------|-------|--------|
-| Camera / Photo library | **No** – photos come from a curated library; the profile photo picker was removed | ✅ no `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` needed; none present (declaring unused ones is a rejection risk) |
-| Location, contacts, microphone, Bluetooth, health, motion | No | ✅ none declared |
-| Push notifications | **No** – removed. The starter kit requested notification permission from onboarding and a showcase tab with no user benefit, which reviewers reject under 4.5.4 / 5.1.1 | 🔧 `NotificationService`, Firebase Messaging, onboarding "Enable notifications" page removed |
-| App Tracking Transparency | Not needed – no tracking, no IDFA | ✅ |
-| Arbitrary loads (`NSAllowsArbitraryLoads = true`) | Was enabled with no justification | 🔧 removed; all traffic is HTTPS |
-| Export compliance | 🔧 `ITSAppUsesNonExemptEncryption = false` added |
+## 5. Privacy manifest (`PrivacyInfo.xcprivacy`)
 
-`Info.plist` now contains only: URL scheme (`photocards`), fonts, launch screen colour, encryption flag. Android: not applicable (no manifest).
+| Check | Status |
+|-------|--------|
+| Valid plist; `NSPrivacyTracking = false`, no tracking domains | ✅ |
+| Collected: User ID, Name (display name), Gameplay Content, Other User Content (custom prompts, report text). All linked, not tracking, App Functionality | ✅ matches `supabase/schema.sql` and the app's RPC calls |
+| `UserDefaults` `CA92.1`: `@AppStorage` (name, dark mode, tutorial flag, prompt packs) and `ReviewManager` | ✅ |
+| File timestamp `C617.1`, disk space `E174.1`, boot time `35F9.1` | ✅ kept. **Correction**: none of these are called by PhotoCards' own code. They cover statically linked SDK code (Nuke disk cache, Supabase networking); the comments now say so. The claim that supabase-swift and Nuke ship their own manifests could not be verified offline |
 
-## 4. Privacy manifest & required-reason APIs
+## 6. Account deletion (5.1.1(v))
 
-| Check | Status | Where |
-|-------|--------|-------|
-| `PrivacyInfo.xcprivacy` in the app bundle | 🔧 added (was missing) | `Src/PhotoCards/PhotoCards/PrivacyInfo.xcprivacy` |
-| `NSPrivacyTracking` | `false`, no tracking domains | ✅ |
-| Collected data types | User ID, Name, Gameplay Content, Other User Content; all linked, not tracking, purpose App Functionality | ✅ mirrors the SQL schema |
-| Required-reason APIs | UserDefaults `CA92.1` (`@AppStorage`), file timestamp `C617.1` and disk space `E174.1` (image cache), system boot time `35F9.1` (networking) | ✅ |
-| Third-party SDK manifests | supabase-swift, Nuke and Factory ship their own manifests. Firebase (Analytics/Messaging) was linked but unused, which would have added Google's data-collection declarations to your label | 🔧 Firebase package removed from the app target |
-| App Privacy label | ⚠️ **You**: declare the same four data types in App Store Connect (see `docs/DEPLOYMENT.md`) |
+| Check | Status |
+|-------|--------|
+| Settings → Account → **Delete account & data**, with confirmation | ✅ `SettingsView` → `RootView` → `DeleteAccountSheet` |
+| Deletes server-side: `delete_my_account()` deletes `auth.users`; profile, players, reports filed and blocks cascade; games you host cascade | ✅ `supabase/schema.sql` |
+| Web instructions | ✅ `web/privacy/`, `web/support/` |
 
-## 5. Broken flows, placeholders, dummy logins (2.1, 2.3, 4.2)
+## 7. User-generated content (1.2)
 
-| Finding | Status |
-|---------|--------|
-| "Settings Coming Soon" placeholder screen | 🔧 replaced by a real Settings screen |
-| "Showcase" tab demonstrating paywall / notification permission with placeholder RevenueCat key (paywall would show an error) | 🔧 removed; the game has no purchases |
-| Five-page template onboarding ("Welcome to iOSJumpstart", "Start building your next great app", **EARLY ACCESS** badge) | 🔧 replaced with a four-page *How to play* that explains the actual game |
-| Auth gate with Apple + Google buttons; Google client ID was `YOUR_GOOGLE_CLIENT_ID` (crash/failed sign-in), URL scheme placeholder in `Info.plist` | 🔧 the game uses guest sign-in only; the Google URL scheme placeholder removed. Apple/Google code remains in the `Authentication` framework but is not reachable from the UI |
-| `FirebaseApp.configure()` at launch without `GoogleService-Info.plist` → **crash on launch** | 🔧 Firebase removed entirely |
-| "Rate App" / "Share App" built App Store URLs from `YOUR_APP_STORE_ID` (dead links) | 🔧 Rate uses the native `SKStoreReviewController` prompt; Share shares the website; the update checker uses Apple's `trackViewUrl` |
-| Launch screen referenced a non-existent `LogoWhite` image | 🔧 colour-only launch screen (`LaunchBackground`) |
-| Bundle ID `com.mosal.SYNAPSEApp` and the template author's `DEVELOPMENT_TEAM` | 🔧 neutral bundle ID, team removed (select yours) |
-| App category "Productivity" | 🔧 Games |
-| Unconfigured backend would show cryptic network errors | 🔧 explicit "Backend not configured" and "Couldn't connect / Try again" screens; guest sign-in never leaves the user on a blank screen |
-| Every in-game error surfaces to the user | 🔧 server messages ("Room not found…", "This room is full", "Only the judge can pick…") are shown in alerts |
-| Empty states | 🔧 Browse (no rooms / offline), blocked list, prompt packs, dealing hand |
-
-No debug bypasses, hidden test menus or "coming soon" buttons remain. `grep -rn "coming soon\|TODO\|placeholder" Src/PhotoCards` returns nothing user-facing.
-
-## 6. User-generated content & safety (1.2)
-
-Display names and custom prompts are user-generated and visible to other players, so 1.2 applies.
+Display names and custom prompts are UGC. The photos come from Picsum/Unsplash and are not user-uploaded.
 
 | Requirement | Status |
 |-------------|--------|
-| Filter objectionable content | 🔧 `banned_words` filter on names and custom prompts (server-side) |
-| Report mechanism | 🔧 flag button on every enlarged photo → reason, details, optional block → `reports` table |
-| Block abusive users | 🔧 `block_user` / `unblock_user`; blocked users cannot join rooms you host; Settings → Blocked players |
-| Act on reports | ⚠️ **You**: review the `reports` table in the Supabase dashboard; set `photos.approved = false` to pull an image |
-| Terms prohibit abuse and describe removal | 🔧 `web/terms/` §3–4 |
+| EULA / terms with **zero tolerance** for objectionable content and abusive users | 🔧 `web/terms/` §3 now says so explicitly, plus the 13+ eligibility and Apple's standard EULA terms. **Correction**: the previous text only said "we may remove content" |
+| Filter | ✅ server-side `banned_words` on names and custom prompts |
+| Report | ⚠️ **Correction**: in the committed code, both `PhotoDetailOverlay` call sites passed `reportUserId: nil`. Only curated photos could be reported, and the actual UGC (names, prompts) could not |
+| Block abusive users | ⚠️ **Correction**: because of that nil, the "Also block this player" toggle never appeared, so **no player could be blocked from the UI**. Settings could only *unblock*. A Swift change on this branch (`Features/Game/GameModeration.swift`) adds player and prompt reports and blocking. Verify on device before submitting, and update `SettingsView`'s footer ("Block someone from a photo's report menu…") to match |
+| Act on reports within 24 h | ⚠️ you: check the `reports` table daily (Supabase dashboard); remove content, ban accounts. Terms and support now promise 24 h |
 
-## 7. Other guideline checks
+## 8. Website (`web/`, deployed by `.github/workflows/pages.yml`)
+
+| Check | Status |
+|-------|--------|
+| Paths `/`, `/privacy/`, `/terms/`, `/support/`, `/licenses/`, `/join/?code=` exist and match `AppConfiguration.App` (`https://tcytseven.github.io/PhotoLine/…`) | ✅ no mismatch |
+| HTML well formed; every relative link and the `#get-the-app` anchor resolve | ✅ checked with a parser |
+| Join page → `photocards://join?code=XXXXXX`, handled by `DeepLinkCoordinator` (`join` host, `code` query) | ✅ |
+| Privacy policy matches the data | 🔧 date; report text and prompt-pack preference added; retention made specific (finished rooms about 2 h, abandoned rooms at most 12 h); no payments or crash reporting |
+| Support page has a real contact method | ✅ public GitHub issues (the repo is public). ⚠️ **Recommended**: add a support **email** address. App Review accepts an issue tracker, but some users can't use one and privacy requests don't belong in public |
+| Licenses page listed only 3 of the libraries that ship | 🔧 added the pointfree, Apple and Google/AppAuth libraries (Apache 2.0 needs attribution) |
+| Pages deploys | ✅ on push to `main` touching `web/**`, or run manually. ⚠️ `configure-pages` `enablement: true` cannot enable Pages with the default token: turn it on once in *Settings → Pages → Source: GitHub Actions*. The site could not be fetched from this environment, so check that it is live |
+| Retention claim depends on `pg_cron` | ⚠️ confirm `photocards_cleanup_expired_games` exists in `cron.job` on the production project |
+
+## 9. Repository hygiene
+
+| Check | Status |
+|-------|--------|
+| `xcuserdata/` committed in 8 projects (including a leftover `Src/iOSJumpstart`) | 🔧 removed from the index. The `.gitignore` pattern `*.xcodeproj/xcuserdata/` contains a slash, so it only matched at the repo root and never matched these folders; it is now `xcuserdata/` |
+| CI only ran on `main` | 🔧 `ios.yml` also runs on pushes to `claude/**`, on manual `workflow_dispatch`, and cancels superseded runs |
+
+## 10. Other guideline checks
 
 | Guideline | Status |
 |-----------|--------|
-| 2.1 Completeness – app runs a full game loop, no test content | ✅ (needs 3 testers; see review notes in `docs/DEPLOYMENT.md`) |
-| 2.5.1 Public APIs only; no private frameworks | ✅ |
-| 2.5.4 Background modes | ✅ none declared |
-| 3.1 Payments | ✅ no purchases (RevenueCat module unused) |
-| 4.0 Design – native controls, Dynamic-Type-friendly fonts, accessibility labels on icon buttons and tiles | ✅ |
-| 4.8 Sign in with Apple | ✅ not required: no third-party login is offered |
-| 5.1.2 Data use – no sharing with third parties beyond the hosting provider | ✅ |
-| 5.1.4 Kids – not a Kids Category app; age rating from the questionnaire | ✅ |
-| Content licensing – starter photos under the Unsplash License, credited in `web/licenses/` | ✅ (⚠️ replace with your own library for a real launch, see README) |
+| 2.1 Completeness: full game loop, no placeholders reachable | ✅ The `API.baseURL`, `Google.clientID` and `RevenueCat.apiKey` placeholders in `AppConfiguration` are unreachable. ⚠️ A game **needs 3 players**, see the review notes below |
+| 2.3 Accurate metadata: screenshots must show real gameplay | ⚠️ |
+| 2.5.4 Background modes | ✅ none |
+| 3.1 Payments | ✅ none; RevenueCat no longer shipped |
+| 4.0 Design on iPad: iPhone-only apps are reviewed on iPad in compatibility mode | ⚠️ run once on an iPad simulator |
+| 5.1.1 Permissions | ✅ no camera, photos, location, contacts, microphone, notifications or ATT prompts; no `NS…UsageDescription` keys |
+| 5.1.2 No tracking, no third-party analytics | ✅ (subject to the GoogleSignIn removal in §4) |
+| Content rights | ⚠️ starter photos are Picsum/Unsplash by numeric id. Review the seeded ids for anything you would not want rated 12+, or ship your own library |
 
-## Remaining actions before submission
+---
 
-1. Fill in Supabase URL/key; run `supabase/schema.sql`; enable anonymous sign-ins.
-2. Enable GitHub Pages so the privacy/terms/support links resolve (or host `web/` and update `AppConfiguration.App`).
-3. Set your team and bundle identifier in Xcode.
-4. Fill in the App Privacy questionnaire exactly as in section 4.
-5. Decide on the photo library (keep Picsum or upload your own).
-6. Optionally remove the unused `Subscription`, `FileHandler` and `Repositories` frameworks from the workspace to shrink the binary.
+## Submission checklist
+
+### Before archiving
+- [ ] Your bundle ID and team in Xcode; App ID registered with **no** capabilities
+- [ ] Build number incremented (`CURRENT_PROJECT_VERSION`)
+- [ ] Production Supabase: `schema.sql` applied, anonymous sign-ins **on**, `pg_cron` cleanup job scheduled
+- [ ] Swift follow-ups landed: player/prompt report + block (§7), GoogleSignIn removed from `Authentication` (§4)
+- [ ] CI green on this branch (Actions → iOS build)
+- [ ] GitHub Pages enabled; `/privacy/`, `/terms/`, `/support/` load on a phone
+- [ ] Product → Archive → Validate App passes, and the Xcode privacy report shows only the four data types below
+
+### App Store Connect: App Information
+- **Name**: PhotoCards · **Subtitle** (optional): e.g. "The photo party game"
+- **Category**: Games. Subcategories: **Card** and **Family** (or Casual). There is no "Party" subcategory
+- **Content rights**: third-party content is present (Unsplash-licensed photos), and you have the rights to use it
+- **Age rating questionnaire**:
+  - User-generated content: **Yes**. Messaging and chat: **No** (no free-text chat; names and prompts are filtered, reportable and blockable)
+  - Unrestricted web access: **No**. The app opens only its own fixed pages in Safari View Controller
+  - Violence, sexual content, profanity/crude humour, horror, drugs, gambling, contests: **None**, unless your prompt packs contain crude humour. If they do, answer **Infrequent/Mild**
+  - Advertising: **No** · In-app purchases: **No** · Parental controls / age assurance: **No**
+  - Expected result: **13+** (UGC between strangers, via public rooms). Keep the terms' 13+ minimum consistent with it
+- **Privacy Policy URL**: `https://tcytseven.github.io/PhotoLine/privacy/`
+
+### App Privacy (nutrition label)
+Data is collected: **Yes**. For each type below: **Linked to the user: Yes**, **Used for tracking: No**, purpose **App Functionality** only.
+
+| Category → type | What it is |
+|-----------------|------------|
+| Identifiers → **User ID** | anonymous Supabase guest ID |
+| Contact Info → **Name** | display name shown to other players |
+| User Content → **Gameplay Content** | rooms, submissions, votes, scores |
+| User Content → **Other User Content** | custom prompts, report reasons/details |
+
+Not collected: contact details, location, photos, device ID, usage data, diagnostics, purchases.
+
+### Version page
+- **Screenshots**: iPhone **6.9"** (1320 × 2868 or 1290 × 2796, portrait) is required. **6.5"** (1242 × 2688 or 1284 × 2778) is needed only if you don't rely on automatic scaling. Up to 10 each, showing home, lobby, hand, reveal/judging and results. No iPad screenshots (iPhone only)
+- **Support URL**: `https://tcytseven.github.io/PhotoLine/support/` · **Marketing URL** (optional): `https://tcytseven.github.io/PhotoLine/`
+- **Copyright**: `2026 <your name>`
+- **Sign-in required**: **No** (guest accounts are created automatically), so no demo account is needed
+
+### App Review notes (paste into Notes)
+
+> PhotoCards is a real-time multiplayer party game. There is no login: a guest account is created automatically on first launch.
+>
+> A round needs **three players on three separate devices** (simulators work too). This is a server rule: the host can't start with fewer than 3.
+> 1. Device A: enter a name → **Create game** → **Create room**. Note the six-letter code.
+> 2. Devices B and C: enter a name → **Join game** → enter the code (or tap *Browse* for public rooms).
+> 3. Device A: **Start game**. B and C each pick a photo; the judge picks a winner. Play continues until the target score.
+>
+> If you only have one device, the attached screen recording shows a complete game from all three devices.
+> [Optionally: "We will keep two devices in a public room named 'App Review' from <date/time, time zone> to <…>; open *Join game → Browse* to join as the third player."]
+>
+> Safety (Guideline 1.2): names and custom prompts pass a server-side word filter. Photos, players and prompts can be reported in-game, and players can be blocked from the report sheet. Settings → Blocked players lists them. We review reports within 24 hours. Terms (zero-tolerance policy): https://tcytseven.github.io/PhotoLine/terms/
+> Account deletion: **Settings → Delete account & data**.
+> The app has no purchases, no ads, no tracking, and does not access the camera or photo library.
+
+- [ ] Attach a screen recording (App Review accepts a video link or attachment) of a full three-device game, including report and block. This is the most likely point of friction for a multiplayer-only app
+- [ ] Consider a solo way in for future versions (a practice round against bots), which removes the three-device requirement for review
+
+### After approval
+- [ ] Set `AppConfiguration.App.appStoreID` (update checker) and link the App Store page from `web/support/#get-the-app`
+- [ ] Check the `reports` table daily
