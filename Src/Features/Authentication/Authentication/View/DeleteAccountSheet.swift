@@ -8,6 +8,7 @@ import Common
 
 public struct DeleteAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewModel = AuthenticationViewModel()
     @State private var isLoading = false
     @State private var error: Error?
@@ -15,6 +16,7 @@ public struct DeleteAccountSheet: View {
     public init() {}
 
     public var body: some View {
+        ScrollView {
         VStack(spacing: 20) {
             Image(systemName: "trash.circle.fill")
                 .font(.system(size: 56))
@@ -25,7 +27,7 @@ public struct DeleteAccountSheet: View {
                 .font(Theme.Typography.title3)
                 .foregroundColor(Theme.Colors.text)
 
-            Text("This will permanently delete your account and all data.")
+            Text("This permanently deletes your guest account, your display name, your game history and any reports or blocks you made. You'll leave any game you're in. This can't be undone.")
                 .font(Theme.Typography.body)
                 .foregroundColor(Theme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -77,7 +79,9 @@ public struct DeleteAccountSheet: View {
             .padding(.top, 8)
         }
         .padding(20)
-        .presentationDetents([.height(340)])
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(380), .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
     }
