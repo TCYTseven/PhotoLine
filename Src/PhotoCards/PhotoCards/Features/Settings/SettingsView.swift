@@ -14,16 +14,17 @@ import Authentication
 struct SettingsView: View {
     @EnvironmentObject private var navigator: AppNavigator
     @AppStorage(AppStorageKeys.playerName) private var playerName = ""
-    @AppStorage(AppStorageKeys.isDarkMode) private var isDarkMode = false
     @Injected(\.gameService) private var gameService: GameService
     @Injected(\.authStatusRepository) private var authStatus: AuthStatusRepository
 
     @StateObject private var reviewManager = ReviewManager()
     @State private var webPage: WebPage?
-    @State private var showDeleteAccount = false
     @State private var showHowToPlay = false
     @State private var guestId = ""
     @State private var nameSaveMessage: String?
+    /// The name as last confirmed by the server, so leaving the screen only
+    /// calls the backend when the name actually changed.
+    @State private var savedName: String?
 
     let onDeleteAccount: () -> Void
 
@@ -35,9 +36,11 @@ struct SettingsView: View {
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .onSubmit { Task { await saveName() } }
+                    .submitLabel(.done)
                     .onChange(of: playerName) { _, newValue in
-                        if newValue.count > 20 { playerName = String(newValue.prefix(20)) }
+                        if newValue.count > PlayerName.maxLength { playerName = String(newValue.prefix(PlayerName.maxLength)) }
                     }
+                    .accessibilityLabel("Display name")
                 if let nameSaveMessage {
                     Text(nameSaveMessage)
                         .font(.footnote)
@@ -61,12 +64,18 @@ struct SettingsView: View {
                     Label("Help & support", systemImage: "lifepreserver")
                 }
                 Button {
-                    reviewManager.requestReview()
+                    reviewManager.openWriteReview()
                 } label: {
                     Label("Rate PhotoCards", systemImage: "star")
                 }
-                ShareLink(item: URL(string: AppConfiguration.App.websiteURL) ?? URL(string: "https://apple.com")!) {
-                    Label("Share PhotoCards", systemImage: "square.and.arrow.up")
+                if let website = URL(string: AppConfiguration.App.websiteURL) {
+                    ShareLink(
+                        item: website,
+                        subject: Text("PhotoCards"),
+                        message: Text("Play PhotoCards with me: the party game where the funniest photo wins.")
+                    ) {
+                        Label("Share PhotoCards", systemImage: "square.and.arrow.up")
+                    }
                 }
             }
 
@@ -97,8 +106,11 @@ struct SettingsView: View {
             }
 
             Section {
+                // Opens the confirmation sheet directly. A confirmation dialog
+                // in front of it was redundant, and presenting the root sheet
+                // while that dialog was still dismissing could drop it.
                 Button(role: .destructive) {
-                    showDeleteAccount = true
+                    onDeleteAccount()
                 } label: {
                     Label("Delete account & data", systemImage: "trash")
                 }
@@ -129,15 +141,10 @@ struct SettingsView: View {
         .sheet(isPresented: $showHowToPlay) {
             HowToPlayView(onDone: { showHowToPlay = false })
         }
-        .confirmationDialog("Delete your account?", isPresented: $showDeleteAccount, titleVisibility: .visible) {
-            Button("Delete account & data", role: .destructive) {
-                onDeleteAccount()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes everything tied to this guest account. You'll get a fresh guest identity next time you play.")
-        }
         .task {
+            if savedName == nil {
+                savedName = PlayerName.clean(playerName)
+            }
             guestId = await authStatus.getCurrentUser()?.id ?? ""
         }
         .onDisappear {
@@ -151,11 +158,12 @@ struct SettingsView: View {
     }
 
     private func saveName() async {
-        let trimmed = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        let trimmed = PlayerName.clean(playerName)
+        guard !trimmed.isEmpty, trimmed != savedName else { return }
         playerName = trimmed
         do {
             try await gameService.updateDisplayName(trimmed)
+            savedName = trimmed
             nameSaveMessage = nil
         } catch is CancellationError {
         } catch {
@@ -175,13 +183,24 @@ struct BlockedUsersView: View {
     var body: some View {
         List {
             Group {
-            if isLoading {
+            if isLoading && users.isEmpty {
                 HStack { Spacer(); ProgressView(); Spacer() }
+            } else if let errorMessage, users.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Couldn't load blocked players")
+                        .font(.headline)
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Button("Try again") { Task { await load() } }
+                        .buttonStyle(.borderless)
+                }
+                .padding(.vertical, 6)
             } else if users.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("No blocked players")
                         .font(.headline)
-                    Text("Block someone from a photo's report menu during a game. Blocked players can't join rooms you host.")
+                    Text("To block someone, use the \u{201C}\u{2026}\u{201D} menu next to their name during a game, or report one of their photos. Blocked players can't join rooms you host.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -200,10 +219,13 @@ struct BlockedUsersView: View {
                             Task { await unblock(user) }
                         }
                         .font(.subheadline.weight(.semibold))
+                        // Only the button, not the whole row, unblocks.
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Unblock \(user.username)")
                     }
                 }
             }
-            if let errorMessage {
+            if let errorMessage, !users.isEmpty {
                 Text(errorMessage).font(.footnote).foregroundColor(.red)
             }
             }

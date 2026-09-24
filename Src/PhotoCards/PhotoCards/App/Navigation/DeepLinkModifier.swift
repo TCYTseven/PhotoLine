@@ -42,39 +42,38 @@ struct DeepLinkModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                setupCoordinator()
+                _ = ensureHandler()
             }
             .onOpenURL { url in
                 Task { @MainActor in
-                    handler?.handle(url: url)
+                    // A cold-start link can arrive before onAppear ran;
+                    // set up on demand so the link isn't dropped.
+                    ensureHandler().handle(url: url)
+                }
+            }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                Task { @MainActor in
+                    ensureHandler().handle(userActivity: activity)
                 }
             }
     }
 
     // MARK: - Setup
 
-    private func setupCoordinator() {
-        #if DEBUG
-        print("🔗 DeepLinkModifier: Setting up coordinator...")
-        #endif
+    /// Creates the handler and coordinator exactly once and returns the handler.
+    /// Rebuilding them would throw away a link that is waiting to be routed.
+    @discardableResult
+    private func ensureHandler() -> DeepLinkHandler {
+        if let handler { return handler }
 
-        // Create handler
         let deepLinkHandler = DeepLinkSetup.createHandler()
-        self.handler = deepLinkHandler
-
-        // Create coordinator
-        let newCoordinator = DeepLinkCoordinator(
-            navigator: navigator
-        )
-
-        // Wire them together
+        let newCoordinator = DeepLinkCoordinator(navigator: navigator)
         deepLinkHandler.setRouteHandler(newCoordinator)
+
+        self.handler = deepLinkHandler
         self.coordinator = newCoordinator
         self.readiness = .handlerConfigured
-
-        #if DEBUG
-        print("🔗 DeepLinkModifier: Setup complete")
-        #endif
+        return deepLinkHandler
     }
 
 }

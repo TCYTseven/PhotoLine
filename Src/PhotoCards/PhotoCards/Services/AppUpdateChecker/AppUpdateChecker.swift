@@ -42,7 +42,12 @@ public final class AppUpdateChecker: AppUpdateCheckerProtocol {
             return nil
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        // Short timeout and no cache: this runs on every foreground and must
+        // never hold anything up. Any failure means "no update info", never
+        // "force an update".
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        request.httpMethod = "GET"
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -63,8 +68,14 @@ public final class AppUpdateChecker: AppUpdateCheckerProtocol {
         let updateURL = storeURL
             ?? URL(string: "https://apps.apple.com/app/id\(appStoreID)")
             ?? URL(string: "https://apps.apple.com")!
-        let isUpdateAvailable = isVersionNewer(latestVersion, than: currentVersion)
-        let isForceUpdateRequired = isMajorVersionNewer(latestVersion, than: currentVersion)
+        // Only when the listing is really this app and this device can
+        // install the newer build; otherwise a force update would lock the
+        // player out with no way forward.
+        let listedBundleID = appInfo["bundleId"] as? String
+        let isSameApp = listedBundleID == nil || listedBundleID == bundleID
+        let canInstall = deviceSupports(minimumOSVersion: appInfo["minimumOsVersion"] as? String)
+        let isUpdateAvailable = isSameApp && canInstall && isVersionNewer(latestVersion, than: currentVersion)
+        let isForceUpdateRequired = isUpdateAvailable && isMajorVersionNewer(latestVersion, than: currentVersion)
 
         log("Current: \(currentVersion), Latest: \(latestVersion), Update available: \(isUpdateAvailable), Force: \(isForceUpdateRequired)")
 
@@ -96,6 +107,18 @@ public final class AppUpdateChecker: AppUpdateCheckerProtocol {
             }
         }
         return false
+    }
+
+    private func deviceSupports(minimumOSVersion: String?) -> Bool {
+        guard let minimumOSVersion, !minimumOSVersion.isEmpty else { return true }
+        let parts = minimumOSVersion.split(separator: ".").compactMap { Int($0) }
+        guard !parts.isEmpty else { return true }
+        let required = OperatingSystemVersion(
+            majorVersion: parts[0],
+            minorVersion: parts.count > 1 ? parts[1] : 0,
+            patchVersion: parts.count > 2 ? parts[2] : 0
+        )
+        return ProcessInfo.processInfo.isOperatingSystemAtLeast(required)
     }
 
     private func isMajorVersionNewer(_ new: String, than current: String) -> Bool {

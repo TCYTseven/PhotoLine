@@ -70,33 +70,13 @@ final class DeepLinkHandler: ObservableObject, @unchecked Sendable {
 
     // MARK: - Setup Validation
 
-    /// Validates that the deep linking system was properly configured.
-    /// Fails with assertion in debug builds if .setupDeepLinking() modifier is missing.
+    /// Debug-only check that a route handler has been attached.
     private func validateSetup() {
-        guard isCoordinatorConfigured else {
-            let errorMessage = """
-
-            ❌ DEEP LINK SETUP ERROR ❌
-
-            Missing .setupDeepLinking() modifier on RootView.
-
-            FIX:
-            Add this to RootView (after .task block):
-                .setupDeepLinking(authStateProvider: viewModel, navigator: navigator)
-
-            LOCATION: RootView.swift
-
-            See docs/DEEP_LINKING.md for details.
-            """
-
-            #if DEBUG
-            print(errorMessage)
-            assertionFailure("Deep linking not configured. Add .setupDeepLinking() modifier to RootView.")
-            #else
-            print("[DeepLink ERROR] Coordinator not configured. Deep links will not work.")
-            #endif
-            return
+        #if DEBUG
+        if !isCoordinatorConfigured {
+            print("🔗 DeepLinkHandler: no route handler yet; links are deferred until withDeepLinking(navigator:) sets one up.")
         }
+        #endif
     }
 
     // MARK: - Handle Incoming URLs
@@ -108,7 +88,9 @@ final class DeepLinkHandler: ObservableObject, @unchecked Sendable {
         validateSetup()
 
         guard let route = parser.parse(url: url) else {
+            #if DEBUG
             print("[DeepLink] Could not parse URL: \(url)")
+            #endif
             return false
         }
 
@@ -122,7 +104,9 @@ final class DeepLinkHandler: ObservableObject, @unchecked Sendable {
         validateSetup()
 
         guard let route = parser.parse(userActivity: userActivity) else {
+            #if DEBUG
             print("[DeepLink] Could not parse user activity")
+            #endif
             return false
         }
 
@@ -153,12 +137,16 @@ final class DeepLinkHandler: ObservableObject, @unchecked Sendable {
         let handled = handler.route(to: route)
         if handled {
             pendingDeepLink = nil
+            #if DEBUG
             print("[DeepLink] Handled: \(route.path)")
+            #endif
             return true
         } else {
             // Handler returned false - defer the link for later
             pendingDeepLink = route
+            #if DEBUG
             print("[DeepLink] Deferred: \(route.path)")
+            #endif
             return true  // Deferred counts as handled
         }
     }

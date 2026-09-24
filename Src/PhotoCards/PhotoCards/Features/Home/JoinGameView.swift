@@ -14,6 +14,7 @@ struct JoinGameView: View {
     @AppStorage(AppStorageKeys.playerName) private var playerName = ""
     @FocusState private var codeFocused: Bool
     @State private var code: String
+    @State private var askForName = false
 
     private static let allowed = Set("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
     private static let length = 6
@@ -28,11 +29,14 @@ struct JoinGameView: View {
         ZStack {
             PhotoBackdrop(imageURL: nil)
 
+            ScrollView {
             VStack(spacing: 26) {
                 VStack(spacing: 8) {
                     Text("Enter the room code")
                         .font(Font.poppins(.bold, size: 24))
                         .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
                     Text("Ask the host. It's shown at the top of their lobby.")
                         .font(Font.poppins(.regular, size: 14))
                         .foregroundColor(.white.opacity(0.75))
@@ -41,6 +45,7 @@ struct JoinGameView: View {
                 .padding(.top, 30)
 
                 codeBoxes
+                    .contentShape(Rectangle())
                     .onTapGesture { codeFocused = true }
 
                 // Hidden text field that actually receives input.
@@ -49,7 +54,6 @@ struct JoinGameView: View {
                     .keyboardType(.asciiCapable)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
-                    .textContentType(.oneTimeCode)
                     .submitLabel(.join)
                     .onSubmit { Task { await join() } }
                     .onChange(of: code) { _, newValue in
@@ -73,24 +77,31 @@ struct JoinGameView: View {
                 .opacity(isComplete ? 1 : 0.6)
                 .padding(.horizontal, 22)
 
-                Button {
-                    if let pasted = UIPasteboard.general.string {
-                        code = Self.sanitise(pasted)
+                // PasteButton reads the clipboard without the system
+                // "Allow Paste" prompt that UIPasteboard access triggers.
+                PasteButton(payloadType: String.self) { strings in
+                    guard let pasted = strings.first else { return }
+                    let cleaned = Self.sanitise(pasted)
+                    Task { @MainActor in
+                        code = cleaned
                     }
-                } label: {
-                    Label("Paste code", systemImage: "doc.on.clipboard")
                 }
-                .buttonStyle(SecondaryPillButtonStyle(height: 46))
-                .padding(.horizontal, 60)
-
-                Spacer()
+                .buttonBorderShape(.capsule)
+                .tint(.white.opacity(0.25))
+                .labelStyle(.titleAndIcon)
             }
+            .padding(.bottom, 24)
+            }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .navigationTitle("Join game")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear { codeFocused = true }
+        .playerNamePrompt(isPresented: $askForName) { name in
+            Task { await join(name: name) }
+        }
     }
 
     private var codeBoxes: some View {
@@ -100,6 +111,8 @@ struct JoinGameView: View {
                 Text(character)
                     .font(Font.poppins(.bold, size: 30))
                     .foregroundColor(.white)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
                     .frame(width: 48, height: 60)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -118,10 +131,15 @@ struct JoinGameView: View {
         String(raw.uppercased().filter { allowed.contains($0) }.prefix(length))
     }
 
-    private func join() async {
-        guard isComplete else { return }
+    private func join(name enteredName: String? = nil) async {
+        guard isComplete, !session.isBusy else { return }
         codeFocused = false
-        let name = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Reached straight from a link, the player may not have a name yet.
+        let name = PlayerName.clean(enteredName ?? playerName)
+        guard !name.isEmpty else {
+            askForName = true
+            return
+        }
         if await session.joinGame(code: code, username: name) {
             PC.notify(.success)
             navigator.popToRoot()

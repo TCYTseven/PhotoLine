@@ -19,6 +19,8 @@ struct BrowseGamesView: View {
     @State private var isLoading = true
     @State private var loadError: String?
     @State private var joiningCode: String?
+    @State private var pendingJoin: PublicGameSummary?
+    @State private var askForName = false
 
     var body: some View {
         ZStack {
@@ -43,6 +45,11 @@ struct BrowseGamesView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .task { await load() }
         .refreshable { await load() }
+        .playerNamePrompt(isPresented: $askForName) { name in
+            if let game = pendingJoin {
+                Task { await join(game, name: name) }
+            }
+        }
     }
 
     private var list: some View {
@@ -87,6 +94,7 @@ struct BrowseGamesView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(session.isBusy)
+                    .accessibilityHint("Joins this room")
                 }
                 Text("Public rooms are open to anyone. You can report or block players from inside a game.")
                     .font(Font.poppins(.regular, size: 12))
@@ -141,9 +149,17 @@ struct BrowseGamesView: View {
         isLoading = false
     }
 
-    private func join(_ game: PublicGameSummary) async {
+    private func join(_ game: PublicGameSummary, name enteredName: String? = nil) async {
+        guard !session.isBusy else { return }
+        // Reached straight from a link, the player may not have a name yet.
+        let name = PlayerName.clean(enteredName ?? playerName)
+        guard !name.isEmpty else {
+            pendingJoin = game
+            askForName = true
+            return
+        }
+        pendingJoin = nil
         joiningCode = game.roomCode
-        let name = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
         if await session.joinGame(code: game.roomCode, username: name) {
             PC.notify(.success)
             navigator.popToRoot()
