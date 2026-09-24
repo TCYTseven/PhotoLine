@@ -31,7 +31,6 @@ class AuthenticationViewModel {
     enum AuthMethod {
         case none
         case apple
-        case google
         case anonymous
     }
     
@@ -48,15 +47,6 @@ class AuthenticationViewModel {
         }
     }
     
-    func signInWithGoogle(completion: @escaping (Bool) -> Void = { _ in }) {
-        authMethod = .google
-        Task {
-            await signIn(using: {
-                try await repository.signInWithGoogle()
-            }, completion: completion)
-        }
-    }
-
     func signInAnonymously(completion: @escaping (Bool) -> Void = { _ in }) {
         authMethod = .anonymous
         Task {

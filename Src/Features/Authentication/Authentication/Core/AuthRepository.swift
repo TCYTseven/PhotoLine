@@ -13,7 +13,6 @@ import Foundation
 public protocol AuthRepository {
     // Social sign-in
     func signInWithApple() async throws -> AuthModel.AuthToken
-    func signInWithGoogle() async throws -> AuthModel.AuthToken
     func signInAnonymously() async throws -> AuthModel.AuthToken
 
     // Token management

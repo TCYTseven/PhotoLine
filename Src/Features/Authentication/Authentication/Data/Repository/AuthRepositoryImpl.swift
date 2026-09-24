@@ -14,9 +14,8 @@ class AuthRepositoryImpl: AuthRepository {
     // Inject data sources
     @Injected(\.authRemoteDataSource) private var remoteDataSource: AuthRemoteDataSource
     @Injected(\.authLocalDataSource) private var localDataSource: AuthLocalDataSource
-    // Lazy: the guest-only app never shows social sign-in, so don't build these.
+    // Lazy: the guest-only app never shows social sign-in, so don't build it.
     @LazyInjected(\.appleAuthProvider) private var appleProvider: AppleAuthProvider
-    @LazyInjected(\.googleAuthProvider) private var googleProvider: GoogleAuthProvider
     @Injected(\.eventViewModel) private var eventViewModel: EventViewModel
     
     // MARK: - Social Sign-in
@@ -55,33 +54,6 @@ class AuthRepositoryImpl: AuthRepository {
         }
     }
     
-    public func signInWithGoogle() async throws -> AuthModel.AuthToken {
-        do {
-            // 1. Get Google credentials
-            let googleResult = try await googleProvider.authenticate()
-
-            // 2. Exchange with backend for token
-            let tokenDto = try await remoteDataSource.authenticateWithGoogle(
-                token: googleResult.token,
-                nonce: googleResult.nonce,
-                userData: googleResult.userData
-            )
-
-            // 3. Create and save token
-            let token = tokenDto.toCore
-            try? await localDataSource.saveToken(token)
-
-            // 4. Emit signed in event
-            await emit(.userLoggedIn)
-
-            return token
-        } catch let error as AuthError {
-            throw error
-        } catch {
-            throw AuthError.unknown(error)
-        }
-    }
-
     public func signInAnonymously() async throws -> AuthModel.AuthToken {
         // 0. Reuse a stored guest session instead of minting a second identity.
         //    If it could not be refreshed only because we are offline, fail

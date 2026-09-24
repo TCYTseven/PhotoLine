@@ -5,7 +5,7 @@
 //  Central configuration file for the app.
 //
 //  PhotoCards only talks to Supabase (guest / anonymous auth, RPCs and
-//  Realtime). The Google, RevenueCat and API sections below belong to optional
+//  Realtime). The RevenueCat and API sections below belong to optional
 //  starter modules the app does not use; they are intentionally empty.
 //
 
@@ -44,15 +44,6 @@ public enum AppConfiguration {
         /// Your Supabase anon/public key (Release)
         public static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptbXRsanhrYnpscWJ0eXNkdXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4ODk3MzAsImV4cCI6MjEwNDQ2NTczMH0.qUukjpgwYZbvtBa85Ts60pBLjzfXBpz3fY6g_izo6X4"
         #endif
-    }
-
-    // MARK: - Google Sign-In
-    // Not used: PhotoCards has no social sign-in. Empty disables the provider
-    // (GoogleAuthProviderImpl refuses to start without a client ID).
-
-    public enum Google {
-        /// Google OAuth Client ID (unused)
-        public static let clientID = ""
     }
 
     // MARK: - RevenueCat

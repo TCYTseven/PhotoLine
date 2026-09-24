@@ -84,7 +84,7 @@ Src/
 │   ├── Info.plist · PrivacyInfo.xcprivacy
 └── Features/                        # Reusable frameworks from the starter kit
     ├── Common/                      # Theme, AppConfiguration, UI primitives
-    ├── Authentication/              # Supabase client, guest/Apple/Google sign-in, account deletion
+    ├── Authentication/              # Supabase client, guest/Apple sign-in, account deletion
     ├── Events/                      # In-app event bus
     └── Repositories/ FileHandler/ Subscription/   # Starter-kit code, not in the workspace or the app
 supabase/schema.sql                  # The whole backend

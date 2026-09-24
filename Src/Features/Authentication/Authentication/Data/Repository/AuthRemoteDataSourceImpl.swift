@@ -47,31 +47,6 @@ class AuthRemoteDataSourceImpl: AuthRemoteDataSource {
         }
     }
 
-    func authenticateWithGoogle(token: String, nonce: String?, userData: [String: Any]?) async throws -> AuthDto.Response {
-        logger.debug("Authenticating with Google")
-        do {
-            // Google requires accessToken - get from userData
-            let accessToken = userData?["accessToken"] as? String
-
-            let session = try await supabase.auth.signInWithIdToken(
-                credentials: OpenIDConnectCredentials(
-                    provider: .google,
-                    idToken: token,
-                    accessToken: accessToken,
-                    nonce: nonce
-                )
-            )
-            logger.debug("Google authentication successful. User: \(session.user.id)")
-            return mapSessionToResponse(session)
-        } catch let error as SupabaseAuthError {
-            logger.error("Supabase Google Auth Error: \(error.localizedDescription)")
-            throw mapSupabaseAuthError(error)
-        } catch {
-            logger.error("Unknown Google Auth Error: \(error)")
-            throw AuthError.unknown(error)
-        }
-    }
-
     func authenticateAnonymously() async throws -> AuthDto.Response {
         logger.debug("Authenticating anonymously")
         do {

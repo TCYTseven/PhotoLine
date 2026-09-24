@@ -50,7 +50,6 @@ When using this starter kit, please follow these security practices:
 |---------|----------|------------|-------|
 | Supabase | Anon Key | Low | Public key, safe in client code with RLS enabled |
 | RevenueCat | Public API Key | Low | Designed for client-side use |
-| Google OAuth | Client ID | Low | Public identifier, not a secret |
 
 **Important**: Never expose your Supabase service role key or any server-side secrets in client code.
 

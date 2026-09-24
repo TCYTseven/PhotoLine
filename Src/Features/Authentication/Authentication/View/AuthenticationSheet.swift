@@ -82,17 +82,6 @@ struct AuthenticationSheet: View {
                         viewModel.signInWithApple()
                     }
                 )
-                
-                AuthButton(
-                    title: "Continue with Google",
-                    icon: "google",
-                    isSystemIcon: false,
-                    isLoading: viewModel.authMethod == .google,
-                    action: {
-                        guard viewModel.authMethod == .none else { return }
-                        viewModel.signInWithGoogle()
-                    }
-                )
             }
             .padding(.horizontal, 24)
             
@@ -156,69 +145,6 @@ struct AppleAuthButton: View {
             .padding(.vertical, 16)
             .background(colorScheme == .dark ? Color.white : Color.black)
             .foregroundColor(colorScheme == .dark ? Color.black : Color.white)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Theme.Colors.border, lineWidth: 1)
-            )
-            .shadowSmall()
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .disabled(isLoading)
-    }
-}
-
-struct AuthButton: View {
-    let title: String
-    let icon: String
-    var isSystemIcon: Bool = true
-    var isLoading: Bool = false
-    let action: () -> Void
-    
-    var body: some View {
-        AppButton.Button(action: action) {
-            HStack {
-                // Icon always visible
-                Group {
-                    Spacer()
-                        .frame(width: 20)
-                    
-                    Spacer()
-                    
-                    if isSystemIcon {
-                        Image(systemName: icon)
-                            .font(.system(size: 20))
-                    } else {
-                        Image(icon)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 20, height: 20)
-                    }
-                }
-                
-                // Text centered
-                Text(title)
-                    .font(Theme.Typography.bodyBold)
-                    .foregroundStyle(Theme.Colors.text)
-                
-                Spacer()
-                
-                // Loading indicator at trailing edge
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: Theme.Colors.text))
-                        .frame(width: 20, height: 20)
-                } else {
-                    // Empty spacer to maintain layout when not loading
-                    Spacer()
-                        .frame(width: 20)
-                }
-            }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Theme.Colors.card)
-            .foregroundColor(Theme.Colors.text)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

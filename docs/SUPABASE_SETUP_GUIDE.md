@@ -20,7 +20,7 @@ The file is idempotent: running it again is safe (it uses `IF NOT EXISTS` / `CRE
 
 **Authentication → Providers → Anonymous sign-ins → ON**
 
-Players are guests; the app creates an anonymous session on first launch. (Apple / Google sign-in code is still present in the `Authentication` framework but is not part of the game flow.)
+Players are guests; the app creates an anonymous session on first launch. (Apple sign-in code is still present in the `Authentication` framework but is not part of the game flow.)
 
 ## 4. Keys
 

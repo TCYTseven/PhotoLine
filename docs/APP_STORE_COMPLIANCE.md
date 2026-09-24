@@ -49,10 +49,10 @@ The first pass (commit `3e64b5e`) got most of the product-level work right. The 
 
 | Check | Status |
 |-------|--------|
-| Every `XCRemoteSwiftPackageReference` in the workspace's projects (app, Common, Events, Authentication: Factory, Nuke, supabase-swift, GoogleSignIn-iOS) is pinned in `PhotoCards.xcworkspace/xcshareddata/swiftpm/Package.resolved`, together with its transitive dependencies (AppAuth, GTMAppAuth, gtm-session-fetcher, GoogleUtilities, app-check, promises, swift-crypto/asn1/http-types, pointfree libraries) | ✅ nothing is missing or dangling |
+| Every `XCRemoteSwiftPackageReference` in the workspace's projects (app, Common, Events, Authentication: Factory, Nuke, supabase-swift) is pinned in `PhotoCards.xcworkspace/xcshareddata/swiftpm/Package.resolved`, together with its transitive dependencies (swift-crypto/asn1/http-types, pointfree libraries) | ✅ nothing is missing or dangling |
 | The last commit removed 92 lines from the workspace `Package.resolved` | ✅ they were the Firebase dependency tree (firebase-ios-sdk, GoogleAppMeasurement, abseil, gRPC, leveldb, nanopb, swift-protobuf, …), which nothing references any more |
 | `Src/PhotoCards/PhotoCards.xcodeproj/project.xcworkspace/.../Package.resolved` still pinned Firebase and a different gtm-session-fetcher major | 🔧 deleted. The workspace file is the only source of truth (CI and the docs both use the workspace) |
-| `Features/Authentication` statically bundles **GoogleSignIn 9**. Its privacy manifest declares Name, Email, Phone, Coarse Location, User ID, Device ID and Other Usage Data (some for Analytics). The app never initialises it, but Xcode's privacy report aggregates it, and it contradicts the App Privacy answers below | ⚠️ **Swift change**: remove `GoogleAuthProviderImpl.swift`, the Google path in `AuthRepository`/`AuthenticationViewModel`, and the GoogleSignIn package from `Authentication.xcodeproj`. The same goes for the unreachable Apple sign-in path. Until then, `web/licenses/` credits the Google libraries |
+| `Features/Authentication` statically bundled **GoogleSignIn 9**, whose privacy manifest declares Name, Email, Phone, Coarse Location, User ID, Device ID and Other Usage Data (some for Analytics). The app never initialised it, but Xcode's privacy report aggregates it, and it contradicted the App Privacy answers below | 🔧 removed: `GoogleAuthProviderImpl.swift`, every Google path in `Authentication`, the GoogleSignIn-iOS package from `Authentication.xcodeproj`, and its pins (GoogleSignIn-iOS, AppAuth-iOS, GTMAppAuth, gtm-session-fetcher, GoogleUtilities, app-check, promises) from both `Package.resolved` files. The unreachable Apple sign-in path remains (it links only Apple frameworks) |
 
 ## 5. Privacy manifest (`PrivacyInfo.xcprivacy`)
 
@@ -92,7 +92,7 @@ Display names and custom prompts are UGC. The photos come from Picsum/Unsplash a
 | Join page → `photocards://join?code=XXXXXX`, handled by `DeepLinkCoordinator` (`join` host, `code` query) | ✅ |
 | Privacy policy matches the data | 🔧 date; report text and prompt-pack preference added; retention made specific (finished rooms about 2 h, abandoned rooms at most 12 h); no payments or crash reporting |
 | Support page has a real contact method | ✅ public GitHub issues (the repo is public). ⚠️ **Recommended**: add a support **email** address. App Review accepts an issue tracker, but some users can't use one and privacy requests don't belong in public |
-| Licenses page listed only 3 of the libraries that ship | 🔧 added the pointfree, Apple and Google/AppAuth libraries (Apache 2.0 needs attribution) |
+| Licenses page listed only 3 of the libraries that ship | 🔧 added the pointfree and Apple libraries (Apache 2.0 needs attribution). The Google/AppAuth entries were dropped when GoogleSignIn was removed |
 | Pages deploys | ✅ on push to `main` touching `web/**`, or run manually. ⚠️ `configure-pages` `enablement: true` cannot enable Pages with the default token: turn it on once in *Settings → Pages → Source: GitHub Actions*. The site could not be fetched from this environment, so check that it is live |
 | Retention claim depends on `pg_cron` | ⚠️ confirm `photocards_cleanup_expired_games` exists in `cron.job` on the production project |
 
@@ -107,13 +107,13 @@ Display names and custom prompts are UGC. The photos come from Picsum/Unsplash a
 
 | Guideline | Status |
 |-----------|--------|
-| 2.1 Completeness: full game loop, no placeholders reachable | ✅ The `API.baseURL`, `Google.clientID` and `RevenueCat.apiKey` placeholders in `AppConfiguration` are unreachable. ⚠️ A game **needs 3 players**, see the review notes below |
+| 2.1 Completeness: full game loop, no placeholders reachable | ✅ The `API.baseURL` and `RevenueCat.apiKey` placeholders in `AppConfiguration` are unreachable. ⚠️ A game **needs 3 players**, see the review notes below |
 | 2.3 Accurate metadata: screenshots must show real gameplay | ⚠️ |
 | 2.5.4 Background modes | ✅ none |
 | 3.1 Payments | ✅ none; RevenueCat no longer shipped |
 | 4.0 Design on iPad: iPhone-only apps are reviewed on iPad in compatibility mode | ⚠️ run once on an iPad simulator |
 | 5.1.1 Permissions | ✅ no camera, photos, location, contacts, microphone, notifications or ATT prompts; no `NS…UsageDescription` keys |
-| 5.1.2 No tracking, no third-party analytics | ✅ (subject to the GoogleSignIn removal in §4) |
+| 5.1.2 No tracking, no third-party analytics | ✅ (GoogleSignIn removed, §4) |
 | Content rights | ⚠️ starter photos are Picsum/Unsplash by numeric id. Review the seeded ids for anything you would not want rated 12+, or ship your own library |
 
 ---
@@ -124,7 +124,7 @@ Display names and custom prompts are UGC. The photos come from Picsum/Unsplash a
 - [ ] Your bundle ID and team in Xcode; App ID registered with **no** capabilities
 - [ ] Build number incremented (`CURRENT_PROJECT_VERSION`)
 - [ ] Production Supabase: `schema.sql` applied, anonymous sign-ins **on**, `pg_cron` cleanup job scheduled
-- [ ] Swift follow-ups landed: player/prompt report + block (§7), GoogleSignIn removed from `Authentication` (§4)
+- [ ] Swift follow-ups landed: player/prompt report + block (§7)
 - [ ] CI green on this branch (Actions → iOS build)
 - [ ] GitHub Pages enabled; `/privacy/`, `/terms/`, `/support/` load on a phone
 - [ ] Product → Archive → Validate App passes, and the Xcode privacy report shows only the four data types below

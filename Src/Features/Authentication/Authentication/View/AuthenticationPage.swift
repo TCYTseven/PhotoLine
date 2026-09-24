@@ -41,19 +41,6 @@ public struct AuthenticationPage: View {
                                 }
                             }
                         )
-
-                        AuthButton(
-                            title: "Continue with Google",
-                            icon: "google",
-                            isSystemIcon: false,
-                            isLoading: viewModel.authMethod == .google,
-                            action: {
-                                guard viewModel.authMethod == .none else { return }
-                                viewModel.signInWithGoogle { success in
-                                    if success { onAuthSuccess() }
-                                }
-                            }
-                        )
                     }
                     .padding(.horizontal, 24)
 
