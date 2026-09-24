@@ -14,7 +14,7 @@ TestFlight and App Store submission for PhotoCards.
 - [ ] `docs/APP_STORE_COMPLIANCE.md` re-checked
 
 ### App Store Connect
-- [ ] App created, name **PhotoCards**, primary category **Games › Party**, secondary **Games › Casual**
+- [ ] App created, name **PhotoCards**, primary category **Games**, subcategories **Card** and **Family** (the App Store has no "Party" subcategory)
 - [ ] Support URL: `https://tcytseven.github.io/PhotoLine/support/`
 - [ ] Privacy Policy URL: `https://tcytseven.github.io/PhotoLine/privacy/`
 - [ ] Screenshots for 6.9" and 6.5" iPhones (home, lobby, hand, reveal, results)
@@ -52,12 +52,13 @@ No data is used for tracking. No third-party analytics or ads.
 > 1. Device A: enter a name, tap **Create game**, tap **Create room**. Note the six-letter code.
 > 2. Devices B and C: enter a name, tap **Join game**, enter the code.
 > 3. Device A: tap **Start game**. B and C pick a photo; A (the judge) picks the winner.
-> Account deletion: **Settings → Delete account & data**. Reporting: open any photo and tap the flag.
+> Account deletion: **Settings → Delete account & data**. Reporting and blocking: in-game report sheet for photos, players and prompts; Settings → Blocked players.
+> See `docs/APP_STORE_COMPLIANCE.md` → *Submission checklist* for the full notes, age-rating answers and screenshot sizes.
 > Privacy policy: https://tcytseven.github.io/PhotoLine/privacy/
 
 ## CI
 
-`.github/workflows/ios.yml` builds the `PhotoCards` scheme for the simulator on every push/PR to `main`. For signed TestFlight uploads from CI, add your certificate and provisioning profile as secrets and extend the workflow with `xcodebuild -exportArchive` or fastlane; nothing in the app requires extra config files (no Firebase plist).
+`.github/workflows/ios.yml` builds the `PhotoCards` scheme for the simulator on every push to `main` or a `claude/**` branch, on PRs to `main`, and on demand (*Actions → iOS build → Run workflow*). For signed TestFlight uploads from CI, add your certificate and provisioning profile as secrets and extend the workflow with `xcodebuild -exportArchive` or fastlane; nothing in the app requires extra config files (no Firebase plist).
 
 ## Post-submission
 

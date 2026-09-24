@@ -18,8 +18,12 @@ struct NetworkBanner: View {
         }
         .foregroundColor(.white)
         .padding(.vertical, 10)
+        .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)
         .background(Theme.Colors.error)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("No internet connection")
+        .accessibilityAddTraits(.updatesFrequently)
     }
 }
 

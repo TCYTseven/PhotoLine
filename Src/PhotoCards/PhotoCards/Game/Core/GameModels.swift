@@ -41,6 +41,12 @@ enum GameMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .rapid: return "bolt.fill"
         }
     }
+
+    /// A mode added on the server later must not fail the whole snapshot.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = GameMode(rawValue: raw) ?? .classic
+    }
 }
 
 enum GamePhase: String, Codable, Sendable {
@@ -49,12 +55,24 @@ enum GamePhase: String, Codable, Sendable {
     case judging
     case roundResults = "round_results"
     case gameOver = "game_over"
+
+    /// Unknown phases fall back to a playable screen instead of failing the
+    /// decode (which would freeze the client on its last snapshot).
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = GamePhase(rawValue: raw) ?? .choosing
+    }
 }
 
 enum GameStatus: String, Codable, Sendable {
     case lobby
     case playing
     case finished
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = GameStatus(rawValue: raw) ?? .playing
+    }
 }
 
 // MARK: - State snapshot
@@ -269,6 +287,13 @@ struct GameServiceError: LocalizedError, Equatable {
     var meansSessionIsGone: Bool {
         let lower = message.lowercased()
         return lower.contains("game not found") || lower.contains("not in this game")
+    }
+
+    /// What to tell the player when `meansSessionIsGone` ends their session.
+    var sessionEndedMessage: String {
+        message.lowercased().contains("not in this game")
+            ? "You're no longer in this room."
+            : "The room was closed."
     }
 }
 

@@ -8,6 +8,7 @@ import Common
 
 public struct DeleteAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewModel = AuthenticationViewModel()
     @State private var isLoading = false
     @State private var error: Error?
@@ -15,6 +16,7 @@ public struct DeleteAccountSheet: View {
     public init() {}
 
     public var body: some View {
+        ScrollView {
         VStack(spacing: 20) {
             Image(systemName: "trash.circle.fill")
                 .font(.system(size: 56))
@@ -25,14 +27,14 @@ public struct DeleteAccountSheet: View {
                 .font(Theme.Typography.title3)
                 .foregroundColor(Theme.Colors.text)
 
-            Text("This will permanently delete your account and all data.")
+            Text("This permanently deletes your guest account, your display name, your game history and any reports or blocks you made. You'll leave any game you're in. This can't be undone.")
                 .font(Theme.Typography.body)
                 .foregroundColor(Theme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
             if let error {
-                Text(error.localizedDescription)
+                Text(message(for: error))
                     .font(Theme.Typography.caption)
                     .foregroundColor(.red)
                     .padding(.horizontal)
@@ -77,9 +79,20 @@ public struct DeleteAccountSheet: View {
             .padding(.top, 8)
         }
         .padding(20)
-        .presentationDetents([.height(340)])
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(380), .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
+    }
+
+    /// AuthError is not a LocalizedError, so `localizedDescription` would
+    /// show "The operation couldn't be completed (Authentication.AuthError …)".
+    private func message(for error: Error) -> String {
+        if let authError = error as? AuthError, case .networkError = authError {
+            return "Couldn't reach the server. Check your connection and try again."
+        }
+        return "Your account couldn't be deleted. Please try again in a moment."
     }
 
     private func deleteAccount() {

@@ -124,37 +124,74 @@ final class SupabaseGameService: GameService, @unchecked Sendable {
 
     // MARK: - Realtime
 
+    /// Yields once every time the channel becomes subscribed (the first
+    /// join and every automatic rejoin after a dropped socket, so the caller
+    /// can catch up on anything it missed) and once per UPDATE of the game
+    /// row. Finishes when the subscription fails or the server closes the
+    /// channel; the caller is expected to observe again after a delay.
     func observeGame(gameId: UUID) -> AsyncStream<Void> {
-        AsyncStream { [client] continuation in
+        let client = self.client
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             // Unique topic per observation: the client caches channels by
             // topic, and re-using a topic that is still tearing down would
             // silently drop the new listener.
             let topic = "game-\(gameId.uuidString.lowercased())-\(UUID().uuidString.lowercased())"
             let channel = client.channel(topic)
+            // Listeners must be registered before subscribing.
             let updates = channel.postgresChange(
                 UpdateAction.self,
                 schema: "public",
                 table: "games",
-                filter: .eq("id", value: gameId)
+                filter: .eq("id", value: gameId.uuidString.lowercased())
             )
+            let statuses = channel.statusChange
 
-            let task = Task {
+            let updatesTask = Task {
+                for await _ in updates {
+                    continuation.yield(())
+                }
+            }
+
+            let statusTask = Task {
+                var wasSubscribed = false
+                for await status in statuses {
+                    switch status {
+                    case .subscribed:
+                        wasSubscribed = true
+                        continuation.yield(())
+                    case .unsubscribed:
+                        // Closed by the server, or a rejoin failed: the SDK
+                        // will not retry this channel on its own.
+                        if wasSubscribed {
+                            continuation.finish()
+                            return
+                        }
+                    default:
+                        break
+                    }
+                }
+            }
+
+            let subscribeTask = Task {
                 do {
                     try await channel.subscribeWithError()
+                    // subscribeWithError can return without joining when the
+                    // socket could not connect.
+                    if channel.status != .subscribed {
+                        continuation.finish()
+                    }
                 } catch {
                     #if DEBUG
                     print("[SupabaseGameService] realtime subscribe failed: \(error)")
                     #endif
+                    continuation.finish()
                 }
-                for await _ in updates {
-                    if Task.isCancelled { break }
-                    continuation.yield(())
-                }
-                continuation.finish()
             }
 
             continuation.onTermination = { _ in
-                task.cancel()
+                subscribeTask.cancel()
+                updatesTask.cancel()
+                statusTask.cancel()
                 // removeChannel unsubscribes and evicts the channel from the cache.
                 Task { await client.removeChannel(channel) }
             }
@@ -175,13 +212,44 @@ final class SupabaseGameService: GameService, @unchecked Sendable {
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as PostgrestError {
-            throw GameServiceError(error.message)
+            throw Self.friendly(error)
         } catch let error as URLError {
             if error.code == .cancelled { throw CancellationError() }
             throw GameServiceError("Couldn't reach the server. Check your connection and try again.")
+        } catch let error as HTTPError {
+            #if DEBUG
+            print("[SupabaseGameService] \(function) HTTP \(error.response.statusCode)")
+            #endif
+            if error.response.statusCode == 401 {
+                throw GameServiceError("Your session expired. Please try again.")
+            }
+            if error.response.statusCode >= 500 {
+                throw GameServiceError("The server is busy right now. Please try again in a moment.")
+            }
+            throw GameServiceError("Something went wrong. Please try again.")
         } catch {
-            throw GameServiceError(error.localizedDescription)
+            if Task.isCancelled { throw CancellationError() }
+            #if DEBUG
+            print("[SupabaseGameService] \(function) failed: \(error)")
+            #endif
+            throw GameServiceError("Something went wrong. Please try again.")
         }
+    }
+
+    /// `raise exception` in schema.sql (SQLSTATE P0001) carries a message
+    /// written for players; everything else (permission errors, constraint
+    /// races, JWT problems) is technical and gets a generic message.
+    private static func friendly(_ error: PostgrestError) -> GameServiceError {
+        if error.code == "P0001" {
+            return GameServiceError(error.message)
+        }
+        #if DEBUG
+        print("[SupabaseGameService] postgrest error \(error.code ?? "?"): \(error.message)")
+        #endif
+        if let code = error.code, code.hasPrefix("PGRST3") {
+            return GameServiceError("Your session expired. Please try again.")
+        }
+        return GameServiceError("Something went wrong. Please try again.")
     }
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {

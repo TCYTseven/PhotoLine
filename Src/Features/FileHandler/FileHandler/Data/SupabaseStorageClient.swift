@@ -13,8 +13,12 @@ final class SupabaseStorageClient: @unchecked Sendable {
     let client: SupabaseClient
 
     private init() {
+        // Same guard as SupabaseClientService: the SDK traps on a URL without a host.
+        let configured = URL(string: EnvironmentVars.SUPABASE_URL)
+        let url = (configured?.host != nil ? configured : nil)
+            ?? URL(string: "https://unconfigured.supabase.co")!
         client = SupabaseClient(
-            supabaseURL: URL(string: EnvironmentVars.SUPABASE_URL)!,
+            supabaseURL: url,
             supabaseKey: EnvironmentVars.SUPABASE_ANON_KEY
         )
     }

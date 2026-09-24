@@ -29,10 +29,6 @@ extension Container {
     var appleAuthProvider: Factory<AppleAuthProvider> {
         self { AppleAuthProviderImpl() }
     }
-
-    var googleAuthProvider: Factory<GoogleAuthProvider> {
-        self { GoogleAuthProviderImpl(clientID: EnvironmentVars.GOOGLE_CLIENT_ID) }
-    }
 }
 
 public extension Container {

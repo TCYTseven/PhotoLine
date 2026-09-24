@@ -31,8 +31,12 @@ class AuthLocalDataSourceImpl: AuthLocalDataSource {
             let tokenData = try keychainService.retrieve(key: KeychainKeys.authToken)
             let wrapper = try JSONDecoder().decode(TokenWrapper.self, from: tokenData)
             return wrapper.token
+        } catch KeychainError.retrieveError(let status) where status == errSecItemNotFound {
+            return nil
         } catch {
-            // Log error but return nil (no token found)
+            // Unreadable or corrupted entry: remove it so it can't wedge future
+            // launches. The Supabase SDK session remains the source of truth.
+            try? keychainService.delete(key: KeychainKeys.authToken)
             return nil
         }
     }
@@ -59,6 +63,7 @@ private struct TokenWrapper: Codable {
             case id
             case email
             case isActive
+            case isAnonymous
         }
     }
     
@@ -75,6 +80,7 @@ private struct TokenWrapper: Codable {
         try userContainer.encode(token.user.id, forKey: .id)
         try userContainer.encode(token.user.email, forKey: .email)
         try userContainer.encode(token.user.isActive, forKey: .isActive)
+        try userContainer.encode(token.user.isAnonymous, forKey: .isAnonymous)
     }
     
     // Custom decoding for AuthToken
@@ -90,8 +96,10 @@ private struct TokenWrapper: Codable {
         let id = try userContainer.decode(String.self, forKey: .id)
         let email = try userContainer.decode(String.self, forKey: .email)
         let isActive = try userContainer.decode(Bool.self, forKey: .isActive)
+        // Absent in tokens written by older builds.
+        let isAnonymous = try userContainer.decodeIfPresent(Bool.self, forKey: .isAnonymous) ?? false
 
-        let user = AuthModel.User(id: id, email: email, isActive: isActive)
+        let user = AuthModel.User(id: id, email: email, isActive: isActive, isAnonymous: isAnonymous)
         self.token = AuthModel.AuthToken(
             accessToken: accessToken,
             refreshToken: refreshToken,

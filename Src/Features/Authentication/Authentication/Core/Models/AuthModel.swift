@@ -44,11 +44,4 @@ public extension AuthModel {
         let nonce: String?
         let userData: [String: Any]?
     }
-
-    
-    struct GoogleAuthResult {
-        let token: String
-        let nonce: String?
-        let userData: [String: Any]?
-    }
 }

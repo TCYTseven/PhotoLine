@@ -37,12 +37,20 @@ struct CreateGameView: View {
             initial.roundTimerSeconds = game.mode == .rapid ? GameSettings.rapidTimerSeconds : game.roundTimerSeconds
             initial.packSlugs = game.promptPackSlugs
             initial.customPrompts = game.customPrompts
+        } else {
+            // Start from the packs chosen under "Prompts" so the choice is
+            // used even if the pack list can't be loaded (or the host taps
+            // Create before it arrives). Unknown slugs are ignored server-side
+            // and it falls back to the default pack.
+            let saved = UserDefaults.standard.string(forKey: AppStorageKeys.selectedPromptPacks) ?? ""
+            initial.packSlugs = saved.split(separator: ",").map(String.init).filter { !$0.isEmpty }
         }
         _settings = State(initialValue: initial)
     }
 
     private var isEditing: Bool { editing != nil }
     @State private var packsFailed = false
+    @State private var askForName = false
     @State private var newPrompt = ""
     @FocusState private var promptFocused: Bool
 
@@ -93,6 +101,19 @@ struct CreateGameView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .task { await loadPacks() }
+        .playerNamePrompt(isPresented: $askForName) { name in
+            Task { await create(name: name) }
+        }
+        // As the in-game settings sheet, GameSessionView's error alert is
+        // hidden behind this sheet, so show save errors here.
+        .alert("Couldn't save settings", isPresented: Binding(
+            get: { isEditing && session.errorMessage != nil },
+            set: { if !$0 { session.errorMessage = nil } }
+        )) {
+            Button("OK") { session.errorMessage = nil }
+        } message: {
+            Text(session.errorMessage ?? "")
+        }
     }
 
     // MARK: - Sections
@@ -211,7 +232,7 @@ struct CreateGameView: View {
                     if packs.isEmpty {
                         HStack {
                             if packsFailed {
-                                Text("Couldn't load packs. The default pack will be used.")
+                                Text("Couldn't load packs. Your saved packs (or the default pack) will be used.")
                                     .font(Font.poppins(.regular, size: 13))
                                     .foregroundColor(.white.opacity(0.75))
                             } else {
@@ -247,6 +268,7 @@ struct CreateGameView: View {
                                     Text("\(pack.promptCount)")
                                         .font(Font.poppins(.medium, size: 12))
                                         .foregroundColor(.white.opacity(0.6))
+                                        .accessibilityLabel("\(pack.promptCount) prompts")
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -379,9 +401,10 @@ struct CreateGameView: View {
         do {
             let loaded = try await gameService.listPromptPacks()
             packs = loaded
-            if settings.packSlugs.isEmpty && !isEditing {
-                let saved = selectedPacks.split(separator: ",").map(String.init)
-                settings.packSlugs = loaded.filter { saved.contains($0.slug) }.map { $0.slug }
+            if !isEditing {
+                // Keep only packs that still exist, then fall back to defaults.
+                let known = Set(loaded.map { $0.slug })
+                settings.packSlugs = settings.packSlugs.filter { known.contains($0) }
                 if settings.packSlugs.isEmpty {
                     settings.packSlugs = loaded.filter { $0.isDefault }.map { $0.slug }
                 }
@@ -391,7 +414,7 @@ struct CreateGameView: View {
         }
     }
 
-    private func create() async {
+    private func create(name enteredName: String? = nil) async {
         promptFocused = false
         if isEditing {
             if await session.updateSettings(settings) {
@@ -400,7 +423,13 @@ struct CreateGameView: View {
             }
             return
         }
-        let name = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !session.isBusy else { return }
+        // Reached straight from a link, the player may not have a name yet.
+        let name = PlayerName.clean(enteredName ?? playerName)
+        guard !name.isEmpty else {
+            askForName = true
+            return
+        }
         if await session.createGame(username: name, settings: settings) {
             selectedPacks = settings.packSlugs.joined(separator: ",")
             PC.notify(.success)

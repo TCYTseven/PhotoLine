@@ -2,7 +2,9 @@
 build/
 DerivedData/
 *.xcuserstate
-*.xcworkspace/xcuserdata/
+# Per-user Xcode state (schemes list, breakpoints). Must be unanchored:
+# a pattern containing a slash only matches at the repo root.
+xcuserdata/
 
 # CocoaPods
 Pods/
@@ -22,7 +24,6 @@ Pods/
 
 # IDE
 .idea/
-*.xcodeproj/xcuserdata/
 
 # AI Tools
 .claude/

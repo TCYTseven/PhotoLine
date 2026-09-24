@@ -19,11 +19,13 @@ struct ForceUpdateView: View {
             Image(systemName: "arrow.down.app")
                 .font(.system(size: 60))
                 .foregroundColor(Theme.Colors.primary)
+                .accessibilityHidden(true)
 
             // Title
             Text("Update Required")
                 .font(Theme.Typography.title2)
                 .foregroundColor(Theme.Colors.text)
+                .accessibilityAddTraits(.isHeader)
 
             // Message
             Text("A new version of \(AppConfiguration.App.name) is available. Please update to continue using the app.")

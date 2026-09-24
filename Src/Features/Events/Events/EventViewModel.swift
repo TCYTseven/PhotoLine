@@ -42,8 +42,13 @@ public final class EventViewModel {
     // MARK: - Properties
     private(set) var lastEvent: Event?
 
-    // Store observers with their interested event types
+    // Store observers with their interested event types. Guarded by `lock`:
+    // events can be emitted from background tasks while views subscribe and
+    // unsubscribe on the main thread.
+    @ObservationIgnored
     private var observers: [ObjectIdentifier: (eventTypes: Set<EventType>, handler: (Event) -> Void)] = [:]
+
+    private let lock = NSLock()
 
     public init() {}
 
@@ -51,16 +56,19 @@ public final class EventViewModel {
     public func emit(_ event: Event) {
         lastEvent = event
 
-        observers.values.forEach { observerInfo in
-            // Check if the observer is interested in this event type
-            let isInterested = observerInfo.eventTypes.contains { eventType in
-                eventType.matches(event)
-            }
-
-            if isInterested {
-                observerInfo.handler(event)
-            }
+        // Snapshot the interested handlers under the lock, then call them
+        // outside it so a handler may subscribe/unsubscribe without deadlocking.
+        let handlers: [(Event) -> Void] = lock.withLock {
+            observers.values
+                .filter { observerInfo in
+                    observerInfo.eventTypes.contains { eventType in
+                        eventType.matches(event)
+                    }
+                }
+                .map { $0.handler }
         }
+
+        handlers.forEach { $0(event) }
     }
 
     public func subscribe(
@@ -69,11 +77,15 @@ public final class EventViewModel {
         handler: @escaping (Event) -> Void
     ) {
         let id = ObjectIdentifier(observer)
-        observers[id] = (eventTypes: eventTypes, handler: handler)
+        lock.withLock {
+            observers[id] = (eventTypes: eventTypes, handler: handler)
+        }
     }
 
     public func unsubscribe(_ observer: AnyObject) {
         let id = ObjectIdentifier(observer)
-        observers.removeValue(forKey: id)
+        lock.withLock {
+            _ = observers.removeValue(forKey: id)
+        }
     }
 }

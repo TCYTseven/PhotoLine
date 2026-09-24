@@ -37,8 +37,13 @@ struct PillButtonStyle: ButtonStyle {
         configuration.label
             .font(Font.poppins(.bold, size: 19))
             .foregroundColor(foreground)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .frame(height: height)
+            // minHeight, not height: the label grows with Dynamic Type
+            // instead of being clipped.
+            .frame(minHeight: height)
             .background(
                 RoundedRectangle(cornerRadius: height / 2.6, style: .continuous)
                     .fill(fill)
@@ -61,8 +66,11 @@ struct SecondaryPillButtonStyle: ButtonStyle {
         configuration.label
             .font(Font.poppins(.semiBold, size: 17))
             .foregroundColor(.white)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
-            .frame(height: height)
+            .frame(minHeight: height)
             .background(
                 RoundedRectangle(cornerRadius: height / 2.6, style: .continuous)
                     .fill(Color.white.opacity(0.16))
@@ -104,11 +112,15 @@ struct GlassTile: View {
                 Text(title)
                     .font(Font.poppins(.semiBold, size: 13))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
             }
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -130,6 +142,9 @@ struct RoundIconButton: View {
                 .frame(width: 40, height: 40)
                 .background(Circle().fill(Color.black.opacity(0.35)))
                 .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                // 44pt minimum hit target (HIG), same 40pt look.
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -248,7 +263,9 @@ struct TimerPill: View {
         .padding(.vertical, 8)
         .background(Capsule().fill(Color.black.opacity(0.4)))
         .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 1))
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(seconds) seconds left")
+        .accessibilityAddTraits(.updatesFrequently)
     }
 }
 
@@ -271,6 +288,7 @@ struct RoomCodeChip: View {
         .padding(.vertical, large ? 10 : 6)
         .background(Capsule().fill(Color.white.opacity(0.18)))
         .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1))
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Room code \(code.map { String($0) }.joined(separator: " "))")
     }
 }
@@ -288,6 +306,7 @@ struct ScoreBadge: View {
             .frame(minWidth: 34)
             .padding(.vertical, 6)
             .background(Capsule().fill(PC.red))
+            .accessibilityLabel(score == 1 ? "1 point" : "\(score) points")
     }
 }
 
@@ -302,6 +321,8 @@ struct DarkSectionHeader: View {
             .tracking(1.2)
             .foregroundColor(.white.opacity(0.7))
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

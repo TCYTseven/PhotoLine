@@ -14,19 +14,10 @@
             location = "group:Events/Events.xcodeproj">
          </FileRef>
          <FileRef
-            location = "group:Repositories/Repositories.xcodeproj">
-         </FileRef>
-         <FileRef
-            location = "group:FileHandler/FileHandler.xcodeproj">
-         </FileRef>
-         <FileRef
             location = "group:Authentication/Authentication.xcodeproj">
          </FileRef>
          <FileRef
             location = "group:Common/Common.xcodeproj">
-         </FileRef>
-         <FileRef
-            location = "group:Subscription/Subscription.xcodeproj">
          </FileRef>
       </Group>
    </Group>

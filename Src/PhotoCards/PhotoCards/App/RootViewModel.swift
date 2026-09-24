@@ -46,7 +46,25 @@ final class RootViewModel: ObservableObject {
         Container.shared.eventViewModel().unsubscribe(self)
     }
 
+    /// The sign-in currently running, if any. The launch `.task`, the Retry
+    /// button, the reconnect retry and the post-deletion `userLoggedOut`
+    /// event can overlap; coalescing keeps a single guest sign-in in flight
+    /// so we never create two anonymous users (and orphan one).
+    /// Failures stay in `.failed` with a Retry button; nothing here loops.
+    private var bootstrapTask: Task<Void, Never>?
+
     func bootstrap() async {
+        if let running = bootstrapTask {
+            await running.value
+            return
+        }
+        let task = Task { await self.performBootstrap() }
+        bootstrapTask = task
+        await task.value
+        bootstrapTask = nil
+    }
+
+    private func performBootstrap() async {
         guard AppConfiguration.Supabase.isConfigured else {
             launchState = .unconfigured
             return

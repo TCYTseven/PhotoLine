@@ -12,8 +12,10 @@ struct LobbyView: View {
     let onEditSettings: () -> Void
 
     @State private var showDetails = false
+    @State private var copied = false
 
     private var canStart: Bool { state.players.count >= 3 }
+    private var missingPlayers: Int { max(0, 3 - state.players.count) }
 
     private var shareText: String {
         "Join my PhotoCards room! Code: \(state.game.roomCode)\n\(AppConfiguration.App.joinURL(code: state.game.roomCode))"
@@ -39,22 +41,32 @@ struct LobbyView: View {
             Text("Invite your crew")
                 .font(Font.poppins(.bold, size: 24))
                 .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
             Text("Share the code. Get everyone in.")
                 .font(Font.poppins(.regular, size: 13))
                 .foregroundStyle(.white.opacity(0.65))
+                .multilineTextAlignment(.center)
             RoomCodeChip(code: state.game.roomCode, large: true)
             HStack(spacing: 12) {
                 ShareLink(item: shareText) {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(SecondaryPillButtonStyle(height: 44))
+                .accessibilityLabel("Share room code")
                 Button {
                     UIPasteboard.general.string = state.game.roomCode
                     PC.notify(.success)
+                    copied = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(2))
+                        copied = false
+                    }
                 } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                 }
                 .buttonStyle(SecondaryPillButtonStyle(height: 44))
+                .accessibilityLabel(copied ? "Room code copied" : "Copy room code")
             }
         }
         .padding(18)
@@ -69,6 +81,7 @@ struct LobbyView: View {
                 Text("\(state.players.count)/\(state.game.maxPlayers)")
                     .font(Font.poppins(.semiBold, size: 12))
                     .foregroundColor(.white.opacity(0.7))
+                    .accessibilityLabel("\(state.players.count) of \(state.game.maxPlayers) players")
             }
             SurfaceCard(padding: 0) {
                 VStack(spacing: 0) {
@@ -79,7 +92,8 @@ struct LobbyView: View {
                         }
                     }
                     if !canStart {
-                        Text("Waiting for \(3 - state.players.count) more players")
+                        Text("Waiting for \(missingPlayers) more player\(missingPlayers == 1 ? "" : "s") (3 needed to start)")
+                            .multilineTextAlignment(.center)
                             .font(Font.poppins(.regular, size: 13))
                             .foregroundColor(.white.opacity(0.7))
                             .padding(12)
@@ -97,6 +111,8 @@ struct LobbyView: View {
                     Button("Edit") { onEditSettings() }
                         .font(Font.poppins(.semiBold, size: 13))
                         .foregroundColor(.white)
+                        .disabled(session.isBusy)
+                        .accessibilityLabel("Edit settings")
                 }
             }
             SurfaceCard {
@@ -117,8 +133,8 @@ struct LobbyView: View {
                     DisclosureGroup("Details", isExpanded: $showDetails) {
                         VStack(alignment: .leading, spacing: 10) {
                             settingRow(icon: "flag.checkered", title: "\(state.game.maxRounds) rounds", detail: "First to \(state.game.targetScore) points wins early")
-                            settingRow(icon: "timer", title: "\(state.game.roundTimerSeconds)s per round", detail: "\(state.game.handSize) photos in hand, \(state.game.refreshesPerPlayer) refreshes")
-                            settingRow(icon: "text.quote", title: state.game.promptPacks.joined(separator: ", "), detail: state.game.customPromptCount > 0 ? "+ \(state.game.customPromptCount) custom prompts" : "Prompt packs")
+                            settingRow(icon: "timer", title: "\(state.game.roundTimerSeconds)s per round", detail: "\(state.game.handSize) photos in hand, \(state.game.refreshesPerPlayer) refresh\(state.game.refreshesPerPlayer == 1 ? "" : "es")")
+                            settingRow(icon: "text.quote", title: state.game.promptPacks.isEmpty ? "Default prompts" : state.game.promptPacks.joined(separator: ", "), detail: state.game.customPromptCount > 0 ? "+ \(state.game.customPromptCount) custom prompts" : "Prompt packs")
                             settingRow(icon: state.game.isPublic ? "globe" : "lock.fill", title: state.game.isPublic ? "Public room" : "Private room", detail: state.game.isPublic ? "Listed under Browse" : "Only people with the code")
                         }
                         .padding(.top, 8)
@@ -137,6 +153,7 @@ struct LobbyView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(width: 28)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(Font.poppins(.semiBold, size: 15))
@@ -147,6 +164,7 @@ struct LobbyView: View {
             }
             Spacer()
         }
+        .accessibilityElement(children: .combine)
     }
 
     private var footer: some View {
@@ -159,7 +177,9 @@ struct LobbyView: View {
                 } label: {
                     HStack(spacing: 10) {
                         if session.isBusy { ProgressView().tint(.white) }
-                        Text(canStart ? "Start game" : "Waiting for players…")
+                        Text(canStart ? "Start game" : "Need \(missingPlayers) more player\(missingPlayers == 1 ? "" : "s")")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
                 .buttonStyle(PillButtonStyle())
@@ -171,11 +191,13 @@ struct LobbyView: View {
                 } label: {
                     Label(isReady ? "Ready!" : "I'm ready", systemImage: isReady ? "checkmark.circle.fill" : "circle")
                 }
-                .buttonStyle(PillButtonStyle(fill: isReady ? Color.green : PC.red))
+                .buttonStyle(PillButtonStyle(fill: isReady ? Color(red: 0.12, green: 0.52, blue: 0.28) : PC.red))
+                .accessibilityHint(isReady ? "Double tap if you are not ready yet" : "Tells the host you are ready")
                 .disabled(session.isBusy)
                 Text("The host starts the game once everyone is in.")
                     .font(Font.poppins(.regular, size: 12))
                     .foregroundColor(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
             }
         }
         .padding(.horizontal, 18)
@@ -203,56 +225,72 @@ struct PlayerRow: View {
         case none
     }
 
+    @Environment(\.gameModeration) private var moderation
+
     let player: PlayerInfo
     var isMe = false
     var trailing: Trailing = .none
+    /// Shows the report / block menu for other players.
+    var showsActions = true
+
+    private var isBlocked: Bool { moderation.isBlocked(player.userId) }
+    private var name: String { moderation.displayName(player.username, userId: player.userId) }
 
     var body: some View {
-        HStack(spacing: 12) {
-            avatar
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(player.username)
-                        .font(Font.poppins(.semiBold, size: 16))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    if isMe {
-                        Text("you")
-                            .font(Font.poppins(.medium, size: 11))
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.white.opacity(0.2)))
+        HStack(spacing: 8) {
+            HStack(spacing: 12) {
+                avatar
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(name)
+                            .font(Font.poppins(.semiBold, size: 16))
+                            .foregroundColor(.white.opacity(isBlocked ? 0.6 : 1))
+                            .lineLimit(1)
+                        if isMe {
+                            Text("you")
+                                .font(Font.poppins(.medium, size: 11))
+                                .foregroundColor(.white.opacity(0.8))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.white.opacity(0.2)))
+                        }
                     }
+                    HStack(spacing: 6) {
+                        if player.isHost {
+                            Label("Host", systemImage: "crown.fill")
+                        }
+                        if player.isJudge {
+                            Label("Judge", systemImage: "hand.thumbsup.fill")
+                        }
+                        if !player.isConnected {
+                            Label("Away", systemImage: "wifi.slash")
+                        }
+                    }
+                    .font(Font.poppins(.regular, size: 11))
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(1)
                 }
-                HStack(spacing: 6) {
-                    if player.isHost {
-                        Label("Host", systemImage: "crown.fill")
-                    }
-                    if player.isJudge {
-                        Label("Judge", systemImage: "hand.thumbsup.fill")
-                    }
-                    if !player.isConnected {
-                        Label("Away", systemImage: "wifi.slash")
-                    }
-                }
-                .font(Font.poppins(.regular, size: 11))
-                .foregroundColor(.white.opacity(0.7))
+                Spacer(minLength: 4)
+                trailingView
             }
-            Spacer()
-            trailingView
+            .accessibilityElement(children: .combine)
+
+            if showsActions && !isMe && moderation.canModerate(player) {
+                PlayerActionsMenu(player: player)
+            }
         }
-        .padding(.horizontal, 14)
+        .padding(.leading, 14)
+        .padding(.trailing, showsActions && !isMe ? 4 : 14)
         .padding(.vertical, 10)
-        .accessibilityElement(children: .combine)
     }
 
     private var avatar: some View {
-        Text(String(player.username.prefix(1)).uppercased())
+        Text(isBlocked ? "?" : String(player.username.prefix(1)).uppercased())
             .font(Font.poppins(.bold, size: 17))
             .foregroundColor(.white)
             .frame(width: 38, height: 38)
             .background(Circle().fill(player.isJudge ? PC.red : Color.white.opacity(0.2)))
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -265,6 +303,7 @@ struct PlayerRow: View {
                 .accessibilityLabel(player.isReady ? "Ready" : "Not ready")
         case .score:
             ScoreBadge(score: player.score)
+                .accessibilityLabel("\(player.score) point\(player.score == 1 ? "" : "s")")
         case .submitted:
             if player.isJudge {
                 Text("judging")
@@ -289,21 +328,22 @@ struct PlayerRow: View {
 
 struct LeaderboardView: View {
     let state: GameState
-    var compact = false
 
     var body: some View {
+        let ranked = state.leaderboard
         SurfaceCard(padding: 0) {
             VStack(spacing: 0) {
-                ForEach(Array(state.leaderboard.enumerated()), id: \.element.id) { index, player in
-                    HStack(spacing: 12) {
+                ForEach(Array(ranked.enumerated()), id: \.element.id) { index, player in
+                    HStack(spacing: 0) {
                         Text("\(index + 1)")
                             .font(Font.poppins(.bold, size: 14))
                             .foregroundColor(.white.opacity(0.7))
                             .frame(width: 22)
+                            .accessibilityLabel("Rank \(index + 1)")
                         PlayerRow(player: player, isMe: player.id == state.me.playerId, trailing: .score)
                     }
                     .padding(.leading, 12)
-                    if player.id != state.leaderboard.last?.id {
+                    if player.id != ranked.last?.id {
                         Divider().background(Color.white.opacity(0.15)).padding(.leading, 60)
                     }
                 }

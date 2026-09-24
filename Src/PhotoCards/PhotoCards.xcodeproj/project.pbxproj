@@ -7,9 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2A0C43EA2D824F8900247FE4 /* Subscription.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2A0C43E92D824F8900247FE4 /* Subscription.framework */; };
-		2A0C43EB2D824F8900247FE4 /* Subscription.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2A0C43E92D824F8900247FE4 /* Subscription.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		2A0C4A292D8B39DE00247FE4 /* VideoSubscriberAccount.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2A0C4A282D8B39DE00247FE4 /* VideoSubscriberAccount.framework */; };
 		2A0DED632D77711E009EC90C /* Authentication.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2A0DED622D77711E009EC90C /* Authentication.framework */; };
 		2A0DED642D77711E009EC90C /* Authentication.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2A0DED622D77711E009EC90C /* Authentication.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2A86F34F2D33903A00B3DD33 /* Common.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2A86F34E2D33903A00B3DD33 /* Common.framework */; };
@@ -18,10 +15,6 @@
 		2ACDE7CE2EFD4B600069757F /* NukeUI in Frameworks */ = {isa = PBXBuildFile; productRef = 2ANUKEUI12D8A189600247FE4 /* NukeUI */; };
 		2ADD3B172F03127200C68E16 /* Events.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2ADD3B162F03127200C68E16 /* Events.framework */; };
 		2ADD3B182F03127300C68E16 /* Events.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2ADD3B162F03127200C68E16 /* Events.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		2AFDE9042F030E8D007E26F4 /* Repositories.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2AFDE9032F030E8D007E26F4 /* Repositories.framework */; };
-		2AFDE9052F030E8D007E26F4 /* Repositories.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2AFDE9032F030E8D007E26F4 /* Repositories.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		2AFDE9072F030E97007E26F4 /* FileHandler.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2AFDE9062F030E97007E26F4 /* FileHandler.framework */; };
-		2AFDE9082F030E97007E26F4 /* FileHandler.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 2AFDE9062F030E97007E26F4 /* FileHandler.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2AFDE90B2F030ECF007E26F4 /* Factory in Frameworks */ = {isa = PBXBuildFile; productRef = 2AFDE90A2F030ECF007E26F4 /* Factory */; };
 		2AFDE90D2F030ECF007E26F4 /* FactoryKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2AFDE90C2F030ECF007E26F4 /* FactoryKit */; };
 /* End PBXBuildFile section */
@@ -52,10 +45,7 @@
 			files = (
 				2ADD3B182F03127300C68E16 /* Events.framework in Embed Frameworks */,
 				2A0DED642D77711E009EC90C /* Authentication.framework in Embed Frameworks */,
-				2AFDE9052F030E8D007E26F4 /* Repositories.framework in Embed Frameworks */,
-				2A0C43EB2D824F8900247FE4 /* Subscription.framework in Embed Frameworks */,
 				2A86F3502D33903A00B3DD33 /* Common.framework in Embed Frameworks */,
-				2AFDE9082F030E97007E26F4 /* FileHandler.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -63,36 +53,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2A0C43E92D824F8900247FE4 /* Subscription.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Subscription.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A0C468B2D8A15C800247FE4 /* FirebaseSdkContainer.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = FirebaseSdkContainer.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A0C4A282D8B39DE00247FE4 /* VideoSubscriberAccount.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoSubscriberAccount.framework; path = System/Library/Frameworks/VideoSubscriberAccount.framework; sourceTree = SDKROOT; };
 		2A0DED622D77711E009EC90C /* Authentication.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Authentication.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A0DEDA32D777D44009EC90C /* GoogleSigninLib.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = GoogleSigninLib.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A321CAA2D7C3575000840D6 /* PopupViewLib.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = PopupViewLib.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A436DF72D64E55300B22751 /* FactoryLib.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = FactoryLib.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A5CD8792EFD32EF00015F80 /* NukePkg.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = NukePkg.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A5CD87C2EFD32F800015F80 /* FactoryPkg.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = FactoryPkg.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2A83C03F2D4E844A00A5C482 /* Countries.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Countries.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		2A86F34E2D33903A00B3DD33 /* Common.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Common.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		2AA0193E2D22E73E0053F904 /* PhotoCards.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotoCards.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2AA019502D22E73F0053F904 /* PhotoCardsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoCardsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2AA0195A2D22E73F0053F904 /* PhotoCardsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoCardsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AC645912EFD36ED00BEC9B6 /* FactoryPkg.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = FactoryPkg.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AC645942EFD36F200BEC9B6 /* NukePkg.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = NukePkg.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2ACBEB702D2640E200A4C611 /* KFImageContainer.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = KFImageContainer.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AD52C262D3D617F00949DDD /* KFLibContainer.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = KFLibContainer.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		2ADD3B162F03127200C68E16 /* Events.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Events.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AE100412F01B02500569424 /* FileHandler.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = FileHandler.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AE100882F01BEAB00569424 /* Repositories.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Repositories.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AE103192F02ECE700569424 /* Repositories.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Repositories.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AE1031C2F02ECEB00569424 /* Notifications.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Notifications.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AE1031F2F02ECF000569424 /* DeepLink.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = DeepLink.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AE103772F02FB3400569424 /* DeepLink.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = DeepLink.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AE1FF842F0079BD00569424 /* Events.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Events.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AFDE8752F0306B4007E26F4 /* Repositories.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Repositories.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AFDE8782F0306BC007E26F4 /* FileHandler.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = FileHandler.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AFDE9032F030E8D007E26F4 /* Repositories.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Repositories.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AFDE9062F030E97007E26F4 /* FileHandler.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = FileHandler.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -124,14 +90,10 @@
 				2AC862842F03D64600521E70 /* Supabase in Frameworks */,
 				2ACDE7CE2EFD4B600069757F /* NukeUI in Frameworks */,
 				2ADD3B172F03127200C68E16 /* Events.framework in Frameworks */,
-				2A0C4A292D8B39DE00247FE4 /* VideoSubscriberAccount.framework in Frameworks */,
-				2AFDE9042F030E8D007E26F4 /* Repositories.framework in Frameworks */,
 				2A0DED632D77711E009EC90C /* Authentication.framework in Frameworks */,
-				2A0C43EA2D824F8900247FE4 /* Subscription.framework in Frameworks */,
 				2AFDE90B2F030ECF007E26F4 /* Factory in Frameworks */,
 				2AFDE90D2F030ECF007E26F4 /* FactoryKit in Frameworks */,
 				2A86F34F2D33903A00B3DD33 /* Common.framework in Frameworks */,
-				2AFDE9072F030E97007E26F4 /* FileHandler.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -175,32 +137,8 @@
 			isa = PBXGroup;
 			children = (
 				2ADD3B162F03127200C68E16 /* Events.framework */,
-				2AFDE9062F030E97007E26F4 /* FileHandler.framework */,
-				2AFDE9032F030E8D007E26F4 /* Repositories.framework */,
-				2AFDE8782F0306BC007E26F4 /* FileHandler.framework */,
-				2AFDE8752F0306B4007E26F4 /* Repositories.framework */,
-				2AE103772F02FB3400569424 /* DeepLink.framework */,
-				2AE1031F2F02ECF000569424 /* DeepLink.framework */,
-				2AE1031C2F02ECEB00569424 /* Notifications.framework */,
-				2AE103192F02ECE700569424 /* Repositories.framework */,
-				2AE100882F01BEAB00569424 /* Repositories.framework */,
-				2AE100412F01B02500569424 /* FileHandler.framework */,
-				2AE1FF842F0079BD00569424 /* Events.framework */,
-				2AC645942EFD36F200BEC9B6 /* NukePkg.framework */,
-				2AC645912EFD36ED00BEC9B6 /* FactoryPkg.framework */,
-				2A5CD87C2EFD32F800015F80 /* FactoryPkg.framework */,
-				2A5CD8792EFD32EF00015F80 /* NukePkg.framework */,
-				2A0C4A282D8B39DE00247FE4 /* VideoSubscriberAccount.framework */,
-				2A0C468B2D8A15C800247FE4 /* FirebaseSdkContainer.framework */,
-				2A0C43E92D824F8900247FE4 /* Subscription.framework */,
-				2A321CAA2D7C3575000840D6 /* PopupViewLib.framework */,
-				2A0DEDA32D777D44009EC90C /* GoogleSigninLib.framework */,
 				2A0DED622D77711E009EC90C /* Authentication.framework */,
-				2A436DF72D64E55300B22751 /* FactoryLib.framework */,
-				2A83C03F2D4E844A00A5C482 /* Countries.framework */,
-				2AD52C262D3D617F00949DDD /* KFLibContainer.framework */,
 				2A86F34E2D33903A00B3DD33 /* Common.framework */,
-				2ACBEB702D2640E200A4C611 /* KFImageContainer.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -438,7 +376,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -496,7 +434,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -524,8 +462,7 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 18;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -560,8 +497,7 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 18;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -586,13 +522,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.photocards.ios.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhotoCards.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PhotoCards";
 			};
 			name = Debug;
@@ -604,13 +540,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.photocards.ios.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhotoCards.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PhotoCards";
 			};
 			name = Release;
@@ -626,7 +562,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = PhotoCards;
 			};
 			name = Debug;
@@ -642,7 +578,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = PhotoCards;
 			};
 			name = Release;

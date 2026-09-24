@@ -10,11 +10,12 @@ import CryptoKit
 struct AuthUtils {
     // Adapted from https://firebase.google.com/docs/auth/ios/apple
     static func randomNonceString(length: Int = 32) -> String {
-        precondition(length > 0)
-        var randomBytes = [UInt8](repeating: 0, count: length)
+        var randomBytes = [UInt8](repeating: 0, count: max(length, 1))
         let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
         if errorCode != errSecSuccess {
-            fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+            // Fall back to the system CSPRNG instead of crashing.
+            var generator = SystemRandomNumberGenerator()
+            randomBytes = randomBytes.map { _ in UInt8.random(in: UInt8.min...UInt8.max, using: &generator) }
         }
 
         let charset: [Character] =

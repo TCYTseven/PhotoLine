@@ -44,6 +44,8 @@ struct PhotoTile: View {
     var badge: String? = nil
     var cornerRadius: CGFloat = 14
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.clear
@@ -56,8 +58,8 @@ struct PhotoTile: View {
                 )
                 .shadow(color: selected ? PC.red.opacity(0.6) : .clear, radius: 10)
                 .opacity(dimmed ? 0.45 : 1)
-                .scaleEffect(selected ? 1.03 : 1)
-                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: selected)
+                .scaleEffect(selected && !reduceMotion ? 1.03 : 1)
+                .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7), value: selected)
 
             if let badge {
                 Text(badge)

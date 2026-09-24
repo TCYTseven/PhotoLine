@@ -3,36 +3,60 @@
 //  PhotoCards
 //
 //  Enlarged photo with the primary action (submit / pick / vote) and a
-//  report entry point.
+//  report entry point. The report sheet itself lives in GameSessionView so
+//  it survives the game moving on to the next phase.
 //
 
 import SwiftUI
 import Common
 
 struct PhotoDetailOverlay: View {
+    @Environment(\.gameModeration) private var moderation
+
     let imageURL: URL
     let prompt: String?
+    /// Title of the main button. When `onPrimary` is nil the button is shown
+    /// disabled, which explains why the action isn't available.
     let primaryTitle: String?
     let primaryIcon: String
     let isBusy: Bool
     let onPrimary: (() -> Void)?
     let onClose: () -> Void
-    let reportUserId: UUID?
+    var reportUserId: UUID? = nil
     let reportPhotoId: UUID?
-
-    @State private var showReport = false
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85)
+            Color.black.opacity(0.88)
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture { onClose() }
+                .accessibilityHidden(true)
 
-            VStack(spacing: 16) {
+            VStack(spacing: 14) {
                 HStack {
-                    RoundIconButton(icon: "xmark", label: "Close") { onClose() }
+                    Button {
+                        moderation.report(ReportTarget(
+                            kind: .photo,
+                            reportedUserId: reportUserId,
+                            photoId: reportPhotoId,
+                            context: prompt.map { "Prompt: \($0)" }
+                        ))
+                    } label: {
+                        Label("Report", systemImage: "flag")
+                            .font(Font.poppins(.semiBold, size: 13))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 40)
+                            .background(Capsule().fill(Color.black.opacity(0.35)))
+                            .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Report this photo")
+
                     Spacer()
-                    RoundIconButton(icon: "flag", label: "Report this photo") { showReport = true }
+
+                    RoundIconButton(icon: "xmark", label: "Close preview") { onClose() }
                 }
 
                 if let prompt {
@@ -40,6 +64,8 @@ struct PhotoDetailOverlay: View {
                         .font(Font.poppins(.semiBold, size: 15))
                         .foregroundColor(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
+                        .lineLimit(4)
+                        .minimumScaleFactor(0.8)
                         .padding(.horizontal, 12)
                 }
 
@@ -48,115 +74,37 @@ struct PhotoDetailOverlay: View {
                     .frame(maxHeight: 460)
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 10)
+                    .layoutPriority(-1)
+                    .accessibilityHidden(true)
 
                 Spacer(minLength: 0)
 
-                if let primaryTitle, let onPrimary {
+                if let primaryTitle {
                     Button {
+                        guard let onPrimary else { return }
                         PC.haptic(.medium)
                         onPrimary()
                     } label: {
                         HStack(spacing: 10) {
                             if isBusy { ProgressView().tint(.white) }
                             Label(primaryTitle, systemImage: primaryIcon)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                         }
                     }
-                    .buttonStyle(PillButtonStyle())
-                    .disabled(isBusy)
+                    .buttonStyle(PillButtonStyle(fill: onPrimary == nil ? Color.white.opacity(0.18) : PC.red))
+                    .disabled(isBusy || onPrimary == nil)
                 } else {
                     Text("Tap anywhere to close")
                         .font(Font.poppins(.regular, size: 13))
                         .foregroundColor(.white.opacity(0.6))
+                        .accessibilityHidden(true)
                 }
             }
             .padding(20)
         }
-        .sheet(isPresented: $showReport) {
-            ReportSheet(reportedUserId: reportUserId, photoId: reportPhotoId)
-        }
-    }
-}
-
-// MARK: - Report sheet
-
-struct ReportSheet: View {
-    @EnvironmentObject private var session: GameSessionStore
-    @Environment(\.dismiss) private var dismiss
-
-    let reportedUserId: UUID?
-    let photoId: UUID?
-
-    private let reasons = [
-        "Inappropriate or explicit photo",
-        "Hateful or harassing content",
-        "Offensive name or prompt",
-        "Spam or cheating",
-        "Something else"
-    ]
-
-    @State private var reason: String = "Inappropriate or explicit photo"
-    @State private var details = ""
-    @State private var alsoBlock = false
-    @State private var isSending = false
-    @State private var sent = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("What's wrong?") {
-                    Picker("Reason", selection: $reason) {
-                        ForEach(reasons, id: \.self) { Text($0) }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                }
-                Section("Details (optional)") {
-                    TextField("Tell us more", text: $details, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-                if reportedUserId != nil {
-                    Section {
-                        Toggle("Also block this player", isOn: $alsoBlock)
-                    } footer: {
-                        Text("Blocked players can't join rooms you host, and you won't see theirs.")
-                    }
-                }
-                Section {
-                    Text("Reports are reviewed by the PhotoCards team. Repeated abuse leads to removal from the game.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .navigationTitle("Report")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        Task { await send() }
-                    } label: {
-                        if isSending { ProgressView() } else { Text("Send") }
-                    }
-                    .disabled(isSending)
-                }
-            }
-            .alert("Thanks for the report", isPresented: $sent) {
-                Button("Done") { dismiss() }
-            } message: {
-                Text("We'll take a look.")
-            }
-        }
-    }
-
-    private func send() async {
-        isSending = true
-        let ok = await session.report(reason: reason, details: details.isEmpty ? nil : details, reportedUserId: reportedUserId, photoId: photoId)
-        if ok, alsoBlock, let reportedUserId {
-            _ = await session.block(userId: reportedUserId)
-        }
-        isSending = false
-        if ok { sent = true }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape) { onClose() }
     }
 }

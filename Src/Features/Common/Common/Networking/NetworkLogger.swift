@@ -22,7 +22,12 @@ struct NetworkLogger {
         var components = ["⬆️ \(method) \(url)"]
         
         // Log Headers
-        if let headers = request.allHTTPHeaderFields, !headers.isEmpty {
+        if var headers = request.allHTTPHeaderFields, !headers.isEmpty {
+            // Never write credentials to the log.
+            for key in headers.keys where key.caseInsensitiveCompare("Authorization") == .orderedSame
+                || key.caseInsensitiveCompare("apikey") == .orderedSame {
+                headers[key] = "<redacted>"
+            }
             components.append("Headers: \(headers)")
         }
         

@@ -37,20 +37,16 @@ final class DeepLinkParser: DeepLinkParsing, Sendable {
     /// Parse a URL into a DeepLinkRoute
     func parse(url: URL) -> DeepLinkRoute? {
         // Check if it's our URL scheme
-        if url.scheme == urlScheme {
+        if url.scheme?.lowercased() == urlScheme.lowercased() {
             return parseSchemeURL(url)
         }
 
         // Check if it's a Universal Link
-        if let host = url.host, universalLinkDomains.contains(host) {
+        // Universal Links: https only, on one of our domains.
+        if url.scheme?.lowercased() == "https",
+           let host = url.host?.lowercased(),
+           universalLinkDomains.contains(where: { $0.lowercased() == host }) {
             return parseUniversalLink(url)
-        }
-
-        // Check for https scheme with our domains
-        if url.scheme == "https" || url.scheme == "http" {
-            if let host = url.host, universalLinkDomains.contains(host) {
-                return parseUniversalLink(url)
-            }
         }
 
         return nil
@@ -113,9 +109,11 @@ final class DeepLinkParser: DeepLinkParsing, Sendable {
               let items = components.queryItems else {
             return [:]
         }
-        return Dictionary(uniqueKeysWithValues: items.compactMap { item in
+        // `uniqueKeysWithValues` traps on a repeated key, so a link such as
+        // photocards://join?code=A&code=B would crash the app. Keep the first.
+        return Dictionary(items.compactMap { item -> (String, String)? in
             guard let value = item.value else { return nil }
             return (item.name, value)
-        })
+        }, uniquingKeysWith: { first, _ in first })
     }
 }

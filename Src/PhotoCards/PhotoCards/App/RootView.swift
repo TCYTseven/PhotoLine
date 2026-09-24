@@ -21,12 +21,16 @@ struct RootView: View {
     @StateObject private var session = GameSessionStore(service: Container.shared.gameService())
     @StateObject private var reviewManager = ReviewManager()
 
-    @AppStorage(AppStorageKeys.isDarkMode) private var isDarkMode = false
     @AppStorage(AppStorageKeys.hasSeenHowToPlay) private var hasSeenHowToPlay = false
     @AppStorage(AppStorageKeys.playerName) private var playerName = ""
 
     @State private var showDeleteAccountSheet = false
     @State private var forceUpdateInfo: AppUpdateInfo?
+    /// What the "Heads up" alert shows. Mirrors `session.infoMessage`, but is
+    /// set a beat later when a game has just ended: an alert requested while
+    /// the full-screen game is still dismissing is silently dropped.
+    @State private var infoAlert: String?
+    @State private var gameEndedAt: Date?
 
     @Environment(\.scenePhase) private var scenePhase
     @Injected(\.networkMonitor) private var networkMonitor: NetworkMonitor
@@ -59,8 +63,26 @@ struct RootView: View {
             session.clearSession(message: nil)
             navigator.popToRoot()
         }
-        .onChange(of: scenePhase) { _, phase in
+        // `initial: true` so the cold launch counts too (usage time for the
+        // review prompt, update check); onChange alone skips the first value.
+        .onChange(of: scenePhase, initial: true) { _, phase in
             handleScenePhase(phase)
+        }
+        .onChange(of: networkMonitor.isConnected) { _, connected in
+            // Came back online while stuck on "Couldn't connect": retry for them.
+            if connected, case .failed = viewModel.launchState {
+                Task { await viewModel.bootstrap() }
+            }
+        }
+        .onChange(of: session.isInGame) { wasInGame, isInGame in
+            // A game just ended and the player is back home: a natural,
+            // non-interruptive moment for the (rate-limited) review prompt.
+            if wasInGame && !isInGame {
+                gameEndedAt = Date()
+            }
+            if wasInGame && !isInGame && session.infoMessage == nil && session.errorMessage == nil {
+                reviewManager.requestReviewIfEligible()
+            }
         }
         // ═══ Live game ═══
         .fullScreenCover(isPresented: Binding(
@@ -72,8 +94,11 @@ struct RootView: View {
                 .environmentObject(navigator)
         }
         // ═══ First launch ═══
+        // Never at the same time as a restored game (e.g. after a reinstall the
+        // keychain session survives but UserDefaults don't): two full-screen
+        // covers on one view can't present together.
         .fullScreenCover(isPresented: Binding(
-            get: { !hasSeenHowToPlay && viewModel.launchState == .ready },
+            get: { !hasSeenHowToPlay && viewModel.launchState == .ready && !session.isInGame },
             set: { if !$0 { hasSeenHowToPlay = true } }
         )) {
             HowToPlayView(onDone: { hasSeenHowToPlay = true })
@@ -82,14 +107,17 @@ struct RootView: View {
         .sheet(isPresented: $showDeleteAccountSheet) {
             AnyView(authCoordinator.deleteAccountSheet())
         }
-        // ═══ Room closed / info ═══
+        // ═══ Room closed / create & join errors ═══
+        .onChange(of: session.infoMessage) { _, message in
+            presentInfo(message)
+        }
         .alert("Heads up", isPresented: Binding(
-            get: { session.infoMessage != nil },
-            set: { if !$0 { session.dismissInfo() } }
+            get: { infoAlert != nil },
+            set: { if !$0 { dismissInfoAlert() } }
         )) {
-            Button("OK") { session.dismissInfo() }
+            Button("OK") { dismissInfoAlert() }
         } message: {
-            Text(session.infoMessage ?? "")
+            Text(infoAlert ?? "")
         }
         .overlay {
             if let info = forceUpdateInfo, info.isForceUpdateRequired {
@@ -118,7 +146,10 @@ struct RootView: View {
                     }
             }
             .tint(PC.red)
-            .preferredColorScheme(isDarkMode ? .dark : .light)
+            // Every screen is drawn on the dark photo backdrop with white
+            // text, so the app is dark-only (a light scheme gave dark status
+            // bar text on the dark home screen).
+            .preferredColorScheme(.dark)
             .transition(.opacity)
         }
     }
@@ -139,6 +170,31 @@ struct RootView: View {
         }
     }
 
+    // MARK: - Info alert
+
+    private func presentInfo(_ message: String?) {
+        guard let message else {
+            infoAlert = nil
+            return
+        }
+        Task { @MainActor in
+            // Let the isInGame onChange run first, then wait out the game
+            // cover's dismissal if one is under way.
+            try? await Task.sleep(for: .milliseconds(100))
+            if let ended = gameEndedAt, Date().timeIntervalSince(ended) < 1.5 {
+                try? await Task.sleep(for: .milliseconds(650))
+            }
+            if session.infoMessage == message {
+                infoAlert = message
+            }
+        }
+    }
+
+    private func dismissInfoAlert() {
+        infoAlert = nil
+        session.dismissInfo()
+    }
+
     // MARK: - Scene phase
 
     private func handleScenePhase(_ phase: ScenePhase) {
@@ -150,10 +206,13 @@ struct RootView: View {
             if viewModel.launchState == .ready {
                 Task { await session.restoreActiveGame() }
             }
-        case .inactive, .background:
-            if reviewManager.endSession() {
-                reviewManager.requestReview()
-            }
+        case .background:
+            // Only bank the usage time here. Asking for a review while the
+            // scene is leaving the foreground never shows the prompt, yet
+            // used to mark the player as "already asked" forever.
+            reviewManager.endSession()
+        case .inactive:
+            break
         @unknown default:
             break
         }
@@ -177,6 +236,14 @@ struct LaunchStatusView: View {
     let kind: Kind
     let retry: (() -> Void)?
 
+    private static var unconfiguredMessage: String {
+        #if DEBUG
+        return "Add your Supabase URL and anon key to AppConfiguration.swift and run supabase/schema.sql. See docs/SUPABASE_SETUP_GUIDE.md."
+        #else
+        return "We can't reach our servers right now. Please try again later."
+        #endif
+    }
+
     var body: some View {
         ZStack {
             PhotoBackdrop(imageURL: nil)
@@ -189,10 +256,11 @@ struct LaunchStatusView: View {
                         .font(Font.poppins(.regular, size: 14))
                         .foregroundColor(.white.opacity(0.8))
                 case .unconfigured:
-                    Text("Backend not configured")
+                    Text("PhotoCards is unavailable")
                         .font(Font.poppins(.bold, size: 20))
                         .foregroundColor(.white)
-                    Text("Add your Supabase URL and anon key to AppConfiguration.swift and run supabase/schema.sql. See docs/SUPABASE_SETUP_GUIDE.md.")
+                        .multilineTextAlignment(.center)
+                    Text(Self.unconfiguredMessage)
                         .font(Font.poppins(.regular, size: 14))
                         .foregroundColor(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
@@ -201,6 +269,7 @@ struct LaunchStatusView: View {
                     Text("Couldn't connect")
                         .font(Font.poppins(.bold, size: 20))
                         .foregroundColor(.white)
+                        .accessibilityAddTraits(.isHeader)
                     Text(message)
                         .font(Font.poppins(.regular, size: 14))
                         .foregroundColor(.white.opacity(0.85))
