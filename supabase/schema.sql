@@ -66,7 +66,9 @@ create table if not exists public.profiles (
 
 -- Words that are not allowed inside usernames or custom prompts.
 create table if not exists public.banned_words (
-  word text primary key
+  word       text primary key,
+  -- true: only matches as a whole word ("rape" but not "grape")
+  whole_word boolean not null default false
 );
 
 -- Curated photo library. Replace / extend the seed rows with your own
@@ -148,6 +150,8 @@ create table if not exists public.players (
   refreshes_used int not null default 0,
   joined_at      timestamptz not null default now(),
   left_at        timestamptz,
+  -- Presence: stamped by get_game_state polls; see _sweep_games.
+  last_seen_at   timestamptz not null default now(),
   unique (game_id, user_id)
 );
 create index if not exists players_user_idx on public.players (user_id);
@@ -268,6 +272,56 @@ create table if not exists public.blocked_users (
   check (blocker_id <> blocked_id)
 );
 
+-- Upgrades for databases created before these columns / constraints
+-- existed, plus covering indexes for every foreign key (advisor 0001).
+alter table public.players add column if not exists last_seen_at timestamptz not null default now();
+alter table public.banned_words add column if not exists whole_word boolean not null default false;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'players_username_len') then
+    alter table public.players add constraint players_username_len
+      check (char_length(username) between 1 and 24);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'game_custom_prompts_text_len') then
+    alter table public.game_custom_prompts add constraint game_custom_prompts_text_len
+      check (char_length(text) between 3 and 140);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'reports_reason_len') then
+    alter table public.reports add constraint reports_reason_len
+      check (char_length(reason) between 2 and 80);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'reports_details_len') then
+    alter table public.reports add constraint reports_details_len
+      check (details is null or char_length(details) <= 1000);
+  end if;
+end $$;
+
+-- Covering indexes for every foreign key (advisor 0001). Account deletion
+-- and room cleanup cascade through these.
+create index if not exists blocked_users_blocked_idx          on public.blocked_users (blocked_id);
+create index if not exists game_prompt_packs_pack_idx         on public.game_prompt_packs (pack_id);
+create index if not exists games_current_judge_idx            on public.games (current_judge_player_id);
+create index if not exists games_host_idx                     on public.games (host_id);
+create index if not exists games_winner_idx                   on public.games (winner_player_id);
+create index if not exists games_playing_deadline_idx         on public.games (phase_ends_at) where status = 'playing';
+create index if not exists hands_game_idx                     on public.hands (game_id);
+create index if not exists hands_photo_idx                    on public.hands (photo_id);
+create index if not exists player_photo_history_photo_idx     on public.player_photo_history (photo_id);
+create index if not exists reports_game_idx                   on public.reports (game_id);
+create index if not exists reports_photo_idx                  on public.reports (photo_id);
+create index if not exists reports_reported_user_idx          on public.reports (reported_user_id);
+create index if not exists reports_reporter_idx               on public.reports (reporter_id, created_at desc);
+create index if not exists rounds_custom_prompt_idx           on public.rounds (custom_prompt_id);
+create index if not exists rounds_judge_idx                   on public.rounds (judge_player_id);
+create index if not exists rounds_prompt_idx                  on public.rounds (prompt_id);
+create index if not exists rounds_winner_submission_idx       on public.rounds (winner_submission_id);
+create index if not exists submissions_game_idx               on public.submissions (game_id);
+create index if not exists submissions_photo_idx              on public.submissions (photo_id);
+create index if not exists submissions_player_idx             on public.submissions (player_id);
+create index if not exists votes_submission_idx               on public.votes (submission_id);
+create index if not exists votes_voter_idx                    on public.votes (voter_player_id);
+
 -- ---------------------------------------------------------------------
 -- 3. Triggers
 -- ---------------------------------------------------------------------
@@ -297,7 +351,7 @@ begin
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data ->> 'display_name', new.raw_user_meta_data ->> 'full_name')
+    left(coalesce(new.raw_user_meta_data ->> 'display_name', new.raw_user_meta_data ->> 'full_name'), 40)
   )
   on conflict (id) do nothing;
   return new;
@@ -358,13 +412,13 @@ alter table public.blocked_users        enable row level security;
 
 drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own on public.profiles
-  for select to authenticated using (id = auth.uid());
+  for select to authenticated using (id = (select auth.uid()));
 drop policy if exists profiles_insert_own on public.profiles;
 create policy profiles_insert_own on public.profiles
-  for insert to authenticated with check (id = auth.uid());
+  for insert to authenticated with check (id = (select auth.uid()));
 drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles
-  for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+  for update to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
 
 drop policy if exists photos_select_approved on public.photos;
 create policy photos_select_approved on public.photos
@@ -382,7 +436,7 @@ drop policy if exists games_select_member_or_public on public.games;
 create policy games_select_member_or_public on public.games
   for select to authenticated
   using (
-    host_id = auth.uid()
+    host_id = (select auth.uid())
     or public.is_game_member(id)
     or (is_public and status = 'lobby' and expires_at > now())
   );
@@ -420,20 +474,20 @@ create policy votes_select_own on public.votes
 
 drop policy if exists reports_select_own on public.reports;
 create policy reports_select_own on public.reports
-  for select to authenticated using (reporter_id = auth.uid());
+  for select to authenticated using (reporter_id = (select auth.uid()));
 drop policy if exists reports_insert_own on public.reports;
 create policy reports_insert_own on public.reports
-  for insert to authenticated with check (reporter_id = auth.uid());
+  for insert to authenticated with check (reporter_id = (select auth.uid()));
 
 drop policy if exists blocked_users_select_own on public.blocked_users;
 create policy blocked_users_select_own on public.blocked_users
-  for select to authenticated using (blocker_id = auth.uid());
+  for select to authenticated using (blocker_id = (select auth.uid()));
 drop policy if exists blocked_users_insert_own on public.blocked_users;
 create policy blocked_users_insert_own on public.blocked_users
-  for insert to authenticated with check (blocker_id = auth.uid());
+  for insert to authenticated with check (blocker_id = (select auth.uid()));
 drop policy if exists blocked_users_delete_own on public.blocked_users;
 create policy blocked_users_delete_own on public.blocked_users
-  for delete to authenticated using (blocker_id = auth.uid());
+  for delete to authenticated using (blocker_id = (select auth.uid()));
 
 -- banned_words and player_photo_history: RLS on, no policies → server only.
 
@@ -495,9 +549,22 @@ returns boolean
 language sql
 stable
 as $$
+  with t as (
+    select translate(lower(coalesce(p_text, '')), '013457@$!|', 'oieastasii') as leet
+  ),
+  n as (
+    -- Separators inside a word are dropped (f.u.c.k), but spaces stay word
+    -- boundaries so "Push it" doesn't read as one word containing a slur.
+    select ' ' || regexp_replace(regexp_replace(t.leet, '[^a-z[:space:]]', '', 'g'), '[[:space:]]+', ' ', 'g') || ' ' as squashed,
+           ' ' || regexp_replace(t.leet, '[^a-z]+', ' ', 'g') || ' ' as spaced
+    from t
+  )
   select exists (
-    select 1 from public.banned_words b
-    where lower(coalesce(p_text, '')) like '%' || b.word || '%'
+    select 1
+    from public.banned_words b, n
+    where (not b.whole_word and n.squashed like '%' || b.word || '%')
+       or (b.whole_word and (n.spaced like '% ' || b.word || ' %'
+                             or n.spaced like '% ' || b.word || 's %'))
   );
 $$;
 
@@ -509,12 +576,16 @@ as $$
 declare
   v_name text;
 begin
-  v_name := btrim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g'));
+  -- Drop control and invisible formatting characters (zero-width spaces,
+  -- bidi overrides) that could fake an empty or look-alike name.
+  v_name := regexp_replace(coalesce(p_name, ''),
+                           '[[:cntrl:]\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]', '', 'g');
+  v_name := btrim(regexp_replace(v_name, '\s+', ' ', 'g'));
   if length(v_name) < 1 then
     raise exception 'Please enter a name first.';
   end if;
   if length(v_name) > 20 then
-    v_name := left(v_name, 20);
+    v_name := btrim(left(v_name, 20));
   end if;
   if public._contains_banned_word(v_name) then
     raise exception 'That name is not allowed. Please pick another one.';
@@ -546,10 +617,14 @@ end $$;
 -- Everything a client needs to render any screen. Submissions are only
 -- included once judging starts, and their owners only once the round is
 -- over, which keeps the reveal anonymous.
+--
+-- Also the presence heartbeat: every client polls this every few seconds
+-- while the app is open, so it stamps players.last_seen_at. The sweep
+-- (_sweep_games) marks players it hasn't heard from as disconnected, and
+-- the next call here reconnects them.
 create or replace function public.get_game_state(p_game_id uuid)
 returns jsonb
 language plpgsql
-stable
 security definer
 set search_path = public
 as $$
@@ -574,6 +649,20 @@ begin
   select * into me from public.players where game_id = p_game_id and user_id = v_uid;
   if not found then
     raise exception 'You are not in this game.';
+  end if;
+
+  if me.left_at is null then
+    if not me.is_connected then
+      -- Coming back: lock the game first (same order as every RPC) and
+      -- bump the version so the others see the player return.
+      perform 1 from public.games where id = p_game_id for update;
+      update public.players set is_connected = true, last_seen_at = now() where id = me.id;
+      perform public._touch_game(p_game_id);
+      select * into g from public.games where id = p_game_id;
+      select * into me from public.players where id = me.id;
+    elsif me.last_seen_at < now() - interval '10 seconds' then
+      update public.players set last_seen_at = now() where id = me.id;
+    end if;
   end if;
 
   select * into r from public.rounds where game_id = p_game_id and round_number = g.current_round;
@@ -718,7 +807,11 @@ begin
     ) end,
     'hand',        v_hand,
     'submissions', v_subs,
-    'highlights',  v_highlights
+    'highlights',  v_highlights,
+    -- Additive: user ids the caller has blocked, so the client can hide
+    -- their names / photos in the room.
+    'blocked_user_ids', (select coalesce(jsonb_agg(b.blocked_id), '[]'::jsonb)
+                           from public.blocked_users b where b.blocker_id = v_uid)
   );
 end $$;
 
@@ -828,6 +921,7 @@ declare
   v_round        int;
   v_judge        uuid;
   v_player_count int;
+  v_connected    int;
   v_prompt_id    uuid;
   v_custom_id    uuid;
   v_prompt_text  text;
@@ -835,21 +929,32 @@ begin
   select * into g from public.games where id = p_game_id for update;
   v_round := g.current_round + 1;
 
-  select count(*) into v_player_count
+  select count(*), count(*) filter (where is_connected)
+  into v_player_count, v_connected
   from public.players where game_id = g.id and left_at is null;
   if v_player_count < 3 then
     perform public._finish_game(g.id);
     return;
   end if;
 
-  -- Judge rotates through players in join order (vote mode has no judge).
+  -- Judge rotates through connected players in join order (vote mode has
+  -- no judge). Falls back to everyone if nobody is currently connected.
   if g.mode <> 'vote' then
     select p.id into v_judge
     from public.players p
-    where p.game_id = g.id and p.left_at is null
+    where p.game_id = g.id and p.left_at is null and p.is_connected
     order by p.joined_at
-    offset ((v_round - 1) % v_player_count)
+    offset ((v_round - 1) % greatest(v_connected, 1))
     limit 1;
+
+    if v_judge is null then
+      select p.id into v_judge
+      from public.players p
+      where p.game_id = g.id and p.left_at is null
+      order by p.joined_at
+      offset ((v_round - 1) % v_player_count)
+      limit 1;
+    end if;
   else
     v_judge := null;
   end if;
@@ -1037,6 +1142,70 @@ begin
   end if;
 end $$;
 
+-- Players the current round is still waiting on: active, connected,
+-- not the judge, and without a submission yet. Disconnected players
+-- (app closed for 45s+) are not waited for; the round timer covers them.
+create or replace function public._pending_submitters(p_game_id uuid)
+returns int
+language sql
+stable
+as $$
+  select count(*)::int
+  from public.games g
+  join public.rounds r on r.game_id = g.id and r.round_number = g.current_round
+  join public.players p on p.game_id = g.id
+  where g.id = p_game_id
+    and p.left_at is null
+    and p.is_connected
+    and p.id is distinct from g.current_judge_player_id
+    and not exists (select 1 from public.submissions s where s.round_id = r.id and s.player_id = p.id);
+$$;
+
+create or replace function public._pending_voters(p_game_id uuid)
+returns int
+language sql
+stable
+as $$
+  select count(*)::int
+  from public.games g
+  join public.rounds r on r.game_id = g.id and r.round_number = g.current_round
+  join public.players p on p.game_id = g.id
+  where g.id = p_game_id
+    and p.left_at is null
+    and p.is_connected
+    and not exists (select 1 from public.votes v where v.round_id = r.id and v.voter_player_id = p.id);
+$$;
+
+-- Moves a game on when its phase timer has run out. Caller-agnostic and
+-- idempotent: it re-checks the deadline under the row lock, so a client
+-- nudge and the server sweep can race without double-advancing.
+create or replace function public._advance(p_game_id uuid)
+returns void
+language plpgsql
+as $$
+declare
+  g public.games%rowtype;
+  r public.rounds%rowtype;
+begin
+  select * into g from public.games where id = p_game_id for update;
+  if not found or g.status <> 'playing' or g.phase_ends_at is null or g.phase_ends_at > now() then
+    return;
+  end if;
+
+  select * into r from public.rounds where game_id = g.id and round_number = g.current_round;
+  if g.phase = 'choosing' then
+    perform public._to_judging(g.id);
+  elsif g.phase = 'judging' then
+    if g.mode = 'vote' then
+      perform public._resolve_votes(g.id);
+    else
+      perform public._end_round(g.id, public._random_submission(r.id));
+    end if;
+  elsif g.phase = 'round_results' then
+    perform public._next_round(g.id);
+  end if;
+end $$;
+
 -- ---- Leaving -----------------------------------------------------------
 create or replace function public._player_leaves(p_game_id uuid, p_player_id uuid)
 returns void
@@ -1048,7 +1217,6 @@ declare
   r           public.rounds%rowtype;
   v_new_host  public.players%rowtype;
   v_connected int;
-  v_pending   int;
 begin
   select * into g from public.games where id = p_game_id for update;
   if not found then return; end if;
@@ -1072,20 +1240,14 @@ begin
     return;
   end if;
 
-  if g.status = 'finished' then
-    update public.players set left_at = now(), is_connected = false where id = me.id;
-    perform public._touch_game(g.id);
-    return;
-  end if;
-
-  -- status = playing
   update public.players
-  set left_at = now(), is_connected = false, is_ready = false
+  set left_at = now(), is_connected = false, is_ready = false, is_host = false
   where id = me.id;
 
   select count(*) into v_connected
   from public.players where game_id = g.id and left_at is null;
 
+  -- Host hand-off (playing AND finished, so "Play again" stays usable).
   if me.is_host and v_connected > 0 then
     select * into v_new_host from public.players
     where game_id = g.id and left_at is null
@@ -1094,6 +1256,17 @@ begin
     update public.games set host_id = v_new_host.user_id where id = g.id;
   end if;
 
+  if g.status = 'finished' then
+    if v_connected = 0 then
+      -- Everyone has gone: nothing left to restart.
+      delete from public.games where id = g.id;
+      return;
+    end if;
+    perform public._touch_game(g.id);
+    return;
+  end if;
+
+  -- status = playing
   if v_connected < 3 then
     perform public._finish_game(g.id);
     return;
@@ -1103,11 +1276,7 @@ begin
 
   if g.phase = 'judging' then
     if g.mode = 'vote' then
-      select count(*) into v_pending
-      from public.players p
-      where p.game_id = g.id and p.left_at is null
-        and not exists (select 1 from public.votes v where v.round_id = r.id and v.voter_player_id = p.id);
-      if v_pending = 0 then
+      if public._pending_voters(g.id) = 0 then
         perform public._resolve_votes(g.id);
         return;
       end if;
@@ -1116,12 +1285,7 @@ begin
       return;
     end if;
   elsif g.phase = 'choosing' then
-    select count(*) into v_pending
-    from public.players p
-    where p.game_id = g.id and p.left_at is null
-      and p.id is distinct from g.current_judge_player_id
-      and not exists (select 1 from public.submissions s where s.round_id = r.id and s.player_id = p.id);
-    if v_pending = 0 then
+    if public._pending_submitters(g.id) = 0 then
       perform public._to_judging(g.id);
       return;
     end if;
@@ -1147,6 +1311,92 @@ begin
   end loop;
 end $$;
 
+-- ---- Server-side sweep -------------------------------------------------
+-- Runs every 15 seconds from pg_cron (see below). Clients still nudge
+-- advance_game themselves; the sweep covers the cases they can't:
+--   • marks players whose app stopped polling (45s) as disconnected, so
+--     rounds stop waiting on them and they are skipped as judge;
+--   • advances overdue phases, and ends a phase early when the only
+--     players it is waiting on are disconnected.
+-- A game where nobody is connected is left alone (everyone locked their
+-- phone), so it resumes where it was instead of racing to game over.
+create or replace function public._sweep_game(p_game_id uuid)
+returns void
+language plpgsql
+as $$
+declare
+  g public.games%rowtype;
+  r public.rounds%rowtype;
+begin
+  select * into g from public.games where id = p_game_id for update skip locked;
+  if not found then return; end if;  -- busy right now: next sweep
+
+  if exists (select 1 from public.players p
+             where p.game_id = g.id and p.left_at is null and p.is_connected
+               and p.last_seen_at < now() - interval '45 seconds') then
+    update public.players
+    set is_connected = false
+    where game_id = g.id and left_at is null and is_connected
+      and last_seen_at < now() - interval '45 seconds';
+    perform public._touch_game(g.id);
+  end if;
+
+  if g.status <> 'playing' then return; end if;
+  if not exists (select 1 from public.players p
+                 where p.game_id = g.id and p.left_at is null and p.is_connected) then
+    return;
+  end if;
+
+  if g.phase_ends_at is not null and g.phase_ends_at <= now() - interval '2 seconds' then
+    perform public._advance(g.id);
+    return;
+  end if;
+
+  select * into r from public.rounds where game_id = g.id and round_number = g.current_round;
+  if r.id is null then return; end if;
+
+  if g.phase = 'choosing' then
+    if public._pending_submitters(g.id) = 0
+       and exists (select 1 from public.submissions s where s.round_id = r.id) then
+      perform public._to_judging(g.id);
+    end if;
+  elsif g.phase = 'judging' then
+    if g.mode = 'vote' then
+      if public._pending_voters(g.id) = 0 then
+        perform public._resolve_votes(g.id);
+      end if;
+    elsif not exists (select 1 from public.players p
+                      where p.id = g.current_judge_player_id and p.left_at is null and p.is_connected) then
+      perform public._end_round(g.id, public._random_submission(r.id));
+    end if;
+  end if;
+end $$;
+
+create or replace function public._sweep_games()
+returns int
+language plpgsql
+as $$
+declare
+  v_game record;
+  v_n    int := 0;
+begin
+  for v_game in
+    select g.id from public.games g
+    where g.status = 'playing'
+       or exists (select 1 from public.players p
+                  where p.game_id = g.id and p.left_at is null and p.is_connected
+                    and p.last_seen_at < now() - interval '45 seconds')
+  loop
+    begin
+      perform public._sweep_game(v_game.id);
+      v_n := v_n + 1;
+    exception when others then
+      raise warning 'sweep of game % failed: %', v_game.id, sqlerrm;
+    end;
+  end loop;
+  return v_n;
+end $$;
+
 -- ---- Settings ---------------------------------------------------------
 create or replace function public._apply_game_settings(
   p_game_id             uuid,
@@ -1166,6 +1416,7 @@ declare
   v_mode   public.game_mode := coalesce(p_mode, 'classic');
   v_timer  int := coalesce(p_round_timer_seconds, 60);
   v_prompt text;
+  v_added  int := 0;
 begin
   if v_mode = 'rapid' then
     v_timer := least(v_timer, 20);
@@ -1186,7 +1437,7 @@ begin
   if p_pack_slugs is not null and array_length(p_pack_slugs, 1) > 0 then
     insert into public.game_prompt_packs (game_id, pack_id)
     select p_game_id, pp.id from public.prompt_packs pp
-    where pp.slug = any (p_pack_slugs) and pp.approved
+    where pp.slug = any (p_pack_slugs[1:50]) and pp.approved
     on conflict do nothing;
   end if;
   if not exists (select 1 from public.game_prompt_packs where game_id = p_game_id) then
@@ -1195,12 +1446,17 @@ begin
     on conflict do nothing;
   end if;
 
+  -- Custom prompts: at most 50 per room, 3-140 characters, filtered.
   delete from public.game_custom_prompts where game_id = p_game_id;
   if p_custom_prompts is not null then
-    foreach v_prompt in array p_custom_prompts loop
-      v_prompt := btrim(regexp_replace(coalesce(v_prompt, ''), '\s+', ' ', 'g'));
+    foreach v_prompt in array p_custom_prompts[1:200] loop
+      exit when v_added >= 50;
+      v_prompt := regexp_replace(coalesce(v_prompt, ''),
+                                 '[[:cntrl:]\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]', '', 'g');
+      v_prompt := btrim(regexp_replace(v_prompt, '\s+', ' ', 'g'));
       if length(v_prompt) between 3 and 140 and not public._contains_banned_word(v_prompt) then
         insert into public.game_custom_prompts (game_id, text) values (p_game_id, v_prompt);
+        v_added := v_added + 1;
       end if;
     end loop;
   end if;
@@ -1306,9 +1562,10 @@ begin
 
   if found then
     if me.left_at is not null then
-      -- Rejoin a game in progress.
+      -- Rejoin a game in progress (leaving any other room first).
+      perform public._leave_all_active_games(v_uid);
       update public.players
-      set left_at = null, is_connected = true
+      set left_at = null, is_connected = true, last_seen_at = now()
       where id = me.id;
       perform public._touch_game(g.id);
     end if;
@@ -1318,11 +1575,16 @@ begin
   if g.status <> 'lobby' then
     raise exception 'This game has already started.';
   end if;
-  if exists (select 1 from public.blocked_users b where b.blocker_id = g.host_id and b.blocked_id = v_uid) then
+  -- Blocks work both ways, with anyone already in the room.
+  if exists (
+    select 1
+    from public.players p
+    join public.blocked_users b
+      on (b.blocker_id = p.user_id and b.blocked_id = v_uid)
+      or (b.blocker_id = v_uid and b.blocked_id = p.user_id)
+    where p.game_id = g.id and p.left_at is null
+  ) then
     raise exception 'You can''t join this room.';
-  end if;
-  if exists (select 1 from public.blocked_users b where b.blocker_id = v_uid and b.blocked_id = g.host_id) then
-    raise exception 'You have blocked the host of this room.';
   end if;
 
   select count(*) into v_count from public.players where game_id = g.id and left_at is null;
@@ -1342,10 +1604,10 @@ begin
 end $$;
 
 -- Used on app launch to resume a game the player never explicitly left.
+-- Not STABLE: get_game_state records presence.
 create or replace function public.get_my_active_game()
 returns jsonb
 language plpgsql
-stable
 security definer
 set search_path = public
 as $$
@@ -1445,7 +1707,6 @@ declare
   g         public.games%rowtype;
   me        public.players%rowtype;
   r         public.rounds%rowtype;
-  v_pending int;
 begin
   select * into g from public.games where id = p_game_id for update;
   if not found then raise exception 'Game not found.'; end if;
@@ -1476,13 +1737,7 @@ begin
 
   delete from public.hands where player_id = me.id and photo_id = p_photo_id;
 
-  select count(*) into v_pending
-  from public.players p
-  where p.game_id = g.id and p.left_at is null
-    and p.id is distinct from g.current_judge_player_id
-    and not exists (select 1 from public.submissions s where s.round_id = r.id and s.player_id = p.id);
-
-  if v_pending = 0 then
+  if public._pending_submitters(g.id) = 0 then
     perform public._to_judging(g.id);
   else
     perform public._touch_game(g.id);
@@ -1576,7 +1831,6 @@ declare
   me        public.players%rowtype;
   r         public.rounds%rowtype;
   s         public.submissions%rowtype;
-  v_pending int;
 begin
   select * into g from public.games where id = p_game_id for update;
   if not found then raise exception 'Game not found.'; end if;
@@ -1596,12 +1850,7 @@ begin
   values (r.id, me.id, s.id)
   on conflict (round_id, voter_player_id) do update set submission_id = excluded.submission_id;
 
-  select count(*) into v_pending
-  from public.players p
-  where p.game_id = g.id and p.left_at is null
-    and not exists (select 1 from public.votes v where v.round_id = r.id and v.voter_player_id = p.id);
-
-  if v_pending = 0 then
+  if public._pending_voters(g.id) = 0 then
     perform public._resolve_votes(g.id);
   else
     perform public._touch_game(g.id);
@@ -1621,7 +1870,6 @@ as $$
 declare
   v_uid uuid := public._require_uid();
   g     public.games%rowtype;
-  r     public.rounds%rowtype;
 begin
   select * into g from public.games where id = p_game_id for update;
   if not found then raise exception 'Game not found.'; end if;
@@ -1629,20 +1877,7 @@ begin
     raise exception 'You are not in this game.';
   end if;
 
-  if g.status = 'playing' and g.phase_ends_at is not null and g.phase_ends_at <= now() then
-    select * into r from public.rounds where game_id = g.id and round_number = g.current_round;
-    if g.phase = 'choosing' then
-      perform public._to_judging(g.id);
-    elsif g.phase = 'judging' then
-      if g.mode = 'vote' then
-        perform public._resolve_votes(g.id);
-      else
-        perform public._end_round(g.id, public._random_submission(r.id));
-      end if;
-    elsif g.phase = 'round_results' then
-      perform public._next_round(g.id);
-    end if;
-  end if;
+  perform public._advance(g.id);
 
   return public.get_game_state(g.id);
 end $$;
@@ -1671,9 +1906,26 @@ begin
   delete from public.player_photo_history
   where player_id in (select id from public.players where game_id = g.id);
   delete from public.players where game_id = g.id and left_at is not null;
-  update public.players set score = 0, refreshes_used = 0, is_ready = is_host, is_connected = true
+  -- Players who have since moved on to another live room are not pulled
+  -- back into this one (a user is only ever in one live room).
+  delete from public.players p
+  where p.game_id = g.id
+    and p.user_id <> v_uid
+    and exists (select 1 from public.players o
+                join public.games og on og.id = o.game_id
+                where o.user_id = p.user_id and o.game_id <> g.id
+                  and o.left_at is null and og.status <> 'finished');
+  update public.players
+  set score = 0, refreshes_used = 0, is_host = (user_id = v_uid), is_ready = (user_id = v_uid)
   where game_id = g.id;
   update public.game_custom_prompts set used = false where game_id = g.id;
+
+  -- The code was released when the game finished; take a fresh one if
+  -- another live room has picked it up since.
+  if exists (select 1 from public.games o
+             where o.room_code = g.room_code and o.status <> 'finished' and o.id <> g.id) then
+    update public.games set room_code = public._generate_room_code() where id = g.id;
+  end if;
 
   update public.games
   set status = 'lobby',
@@ -1689,7 +1941,8 @@ begin
   return public.get_game_state(g.id);
 end $$;
 
--- Browse open public lobbies.
+-- Browse open public lobbies (newest 50). Rooms containing anyone the
+-- caller has blocked, or who has blocked the caller, are hidden.
 create or replace function public.list_public_games()
 returns jsonb
 language plpgsql
@@ -1701,24 +1954,35 @@ declare
   v_uid uuid := public._require_uid();
 begin
   return (
-    select coalesce(jsonb_agg(jsonb_build_object(
-        'id',            g.id,
-        'room_code',     g.room_code,
-        'mode',          g.mode,
-        'max_players',   g.max_players,
-        'player_count',  (select count(*) from public.players p where p.game_id = g.id and p.left_at is null),
-        'host_username', (select p.username from public.players p where p.game_id = g.id and p.is_host limit 1),
-        'created_at',    g.created_at
-      ) order by g.created_at desc), '[]'::jsonb)
-    from public.games g
-    where g.is_public
-      and g.status = 'lobby'
-      and g.expires_at > now()
-      and (select count(*) from public.players p where p.game_id = g.id and p.left_at is null) < g.max_players
-      and not exists (select 1 from public.blocked_users b
-                      where (b.blocker_id = g.host_id and b.blocked_id = v_uid)
-                         or (b.blocker_id = v_uid and b.blocked_id = g.host_id))
-    limit 50
+    select coalesce(jsonb_agg(x.obj order by x.created_at desc), '[]'::jsonb)
+    from (
+      select jsonb_build_object(
+          'id',            g.id,
+          'room_code',     g.room_code,
+          'mode',          g.mode,
+          'max_players',   g.max_players,
+          'player_count',  (select count(*) from public.players p where p.game_id = g.id and p.left_at is null),
+          'host_username', (select p.username from public.players p
+                              where p.game_id = g.id and p.is_host and p.left_at is null limit 1),
+          'created_at',    g.created_at
+        ) as obj,
+        g.created_at
+      from public.games g
+      where g.is_public
+        and g.status = 'lobby'
+        and g.expires_at > now()
+        and (select count(*) from public.players p where p.game_id = g.id and p.left_at is null) < g.max_players
+        and not exists (
+          select 1
+          from public.players p
+          join public.blocked_users b
+            on (b.blocker_id = p.user_id and b.blocked_id = v_uid)
+            or (b.blocker_id = v_uid and b.blocked_id = p.user_id)
+          where p.game_id = g.id and p.left_at is null
+        )
+      order by g.created_at desc
+      limit 50
+    ) x
   );
 end $$;
 
@@ -1758,7 +2022,9 @@ $$;
 -- ---------------------------------------------------------------------
 
 -- In-app account deletion (App Store Review Guideline 5.1.1(v)).
--- Removes the auth user; every table above cascades from auth.users, so
+-- Leaves every room first so hosting passes to another player (lobby,
+-- playing and finished rooms alike) instead of closing the room on them,
+-- then removes the auth user; every table cascades from auth.users, so
 -- the profile, players, submissions, votes, reports and blocks go too.
 create or replace function public.delete_my_account()
 returns jsonb
@@ -1768,9 +2034,21 @@ set search_path = public
 as $$
 declare
   v_uid uuid := public._require_uid();
+  v_p   record;
 begin
-  perform public._leave_all_active_games(v_uid);
-  delete from public.games where host_id = v_uid and status <> 'playing';
+  for v_p in
+    select pl.id, pl.game_id from public.players pl
+    where pl.user_id = v_uid and pl.left_at is null
+  loop
+    perform public._player_leaves(v_p.game_id, v_p.id);
+  end loop;
+
+  -- Only rooms nobody else is still in are left hosted by this user.
+  delete from public.games g
+  where g.host_id = v_uid
+    and not exists (select 1 from public.players p
+                    where p.game_id = g.id and p.left_at is null and p.user_id <> v_uid);
+
   delete from auth.users where id = v_uid;
   return jsonb_build_object('ok', true);
 end $$;
@@ -1808,8 +2086,22 @@ begin
   if length(btrim(coalesce(p_reason, ''))) < 2 then
     raise exception 'Please choose a reason.';
   end if;
+  if (select count(*) from public.reports
+      where reporter_id = v_uid and created_at > now() - interval '1 hour') >= 20 then
+    raise exception 'You''ve sent a lot of reports. Please try again later.';
+  end if;
+
+  -- Dangling ids (room already cleaned up, user already deleted) are
+  -- dropped rather than failing the report.
   insert into public.reports (reporter_id, game_id, reported_user_id, photo_id, reason, details)
-  values (v_uid, p_game_id, p_reported_user_id, p_photo_id, left(btrim(p_reason), 80), left(p_details, 1000));
+  values (
+    v_uid,
+    (select id from public.games  where id = p_game_id),
+    (select id from auth.users    where id = p_reported_user_id),
+    (select id from public.photos where id = p_photo_id),
+    left(btrim(p_reason), 80),
+    left(nullif(btrim(coalesce(p_details, '')), ''), 1000)
+  );
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -1894,6 +2186,15 @@ begin
     if not exists (select 1 from cron.job where jobname = 'photocards_cleanup_expired_games') then
       perform cron.schedule('photocards_cleanup_expired_games', '*/30 * * * *', 'select public.cleanup_expired_games();');
     end if;
+    -- Presence + overdue-round sweep. Sub-minute schedules need pg_cron
+    -- 1.5+; fall back to every minute on older versions.
+    if not exists (select 1 from cron.job where jobname = 'photocards_sweep_games') then
+      begin
+        perform cron.schedule('photocards_sweep_games', '15 seconds', 'select public._sweep_games();');
+      exception when others then
+        perform cron.schedule('photocards_sweep_games', '* * * * *', 'select public._sweep_games();');
+      end;
+    end if;
   end if;
 end $$;
 
@@ -1938,19 +2239,19 @@ begin
 end $$;
 
 -- Table privileges: signed-in users can read (RLS filters rows); nobody
--- writes game tables directly; anonymous (not signed in) gets nothing.
-revoke all on all tables in schema public from anon;
-revoke all on all sequences in schema public from anon;
+-- writes tables directly (every write is an RPC that validates, filters
+-- and rate-limits); anonymous (not signed in) gets nothing. Supabase's
+-- default privileges hand out INSERT/UPDATE/DELETE/TRUNCATE on every new
+-- table, so start from nothing and grant back only what is needed.
+revoke all on all tables in schema public from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
 grant usage on schema public to authenticated;
 grant select on
   public.profiles, public.photos, public.prompt_packs, public.prompts, public.games,
   public.players, public.game_prompt_packs, public.game_custom_prompts, public.rounds,
   public.hands, public.submissions, public.votes, public.reports, public.blocked_users
 to authenticated;
-grant insert, update on public.profiles to authenticated;
-grant insert on public.reports to authenticated;
 grant insert, delete on public.blocked_users to authenticated;
-revoke all on public.banned_words, public.player_photo_history from authenticated;
 
 -- Function privileges: public RPCs → authenticated only; "_internal"
 -- helpers → nobody (they only run inside SECURITY DEFINER functions).
@@ -1973,6 +2274,12 @@ begin
       execute format('grant execute on function %s to supabase_auth_admin, service_role', f.signature);
       continue;
     end if;
+    if f.name = 'cleanup_expired_games' then
+      -- Maintenance: pg_cron / service role only.
+      execute format('revoke all on function %s from public, anon, authenticated', f.signature);
+      execute format('grant execute on function %s to service_role', f.signature);
+      continue;
+    end if;
     execute format('revoke all on function %s from public, anon', f.signature);
     if f.name like '\_%' then
       execute format('revoke all on function %s from authenticated', f.signature);
@@ -1991,6 +2298,10 @@ insert into public.banned_words (word) values
   ('fuck'), ('shit'), ('bitch'), ('cunt'), ('nigg'), ('fagg'), ('retard'),
   ('nazi'), ('hitler'), ('kys'), ('rape'), ('whore'), ('slut'), ('porn')
 on conflict do nothing;
+-- Short words that are also parts of harmless words ("grape", "pinkys",
+-- "flame retardant", "Ashkenazi") only match as whole words.
+update public.banned_words set whole_word = true
+where word in ('rape', 'kys', 'retard', 'nazi') and not whole_word;
 
 -- Prompt packs -----------------------------------------------------------
 insert into public.prompt_packs (slug, name, description, is_default, sort_order) values
