@@ -41,7 +41,8 @@ Players are guests; the app creates an anonymous session on first launch. (Apple
 | Triggers | profile auto-created for every auth user, `updated_at` maintenance |
 | RLS | Players can only **read** rooms they are in, only their **own** hand, submission and vote. Nobody writes game tables directly. Anonymous (not signed in) can read nothing. |
 | Engine RPCs | `create_game`, `update_game_settings`, `join_game`, `get_my_active_game`, `get_game_state`, `leave_game`, `set_ready`, `start_game`, `submit_photo`, `refresh_hand`, `pick_winner`, `cast_vote`, `advance_game`, `restart_game`, `list_public_games`, `list_prompt_packs`, `list_prompts` |
-| Account & moderation | `delete_my_account`, `update_display_name`, `report_content`, `block_user`, `unblock_user`, `list_blocked_users`, `cleanup_expired_games` (scheduled with pg_cron when available) |
+| Account & moderation | `delete_my_account`, `update_display_name`, `report_content`, `block_user`, `unblock_user`, `list_blocked_users` |
+| Scheduled (pg_cron, server-only) | `cleanup_expired_games` every 30 minutes; `_sweep_games` every 15 seconds, which marks players whose app stopped polling for 45s as disconnected and advances overdue or only-waiting-on-absent rounds |
 | Realtime | `games` in `supabase_realtime`, `REPLICA IDENTITY FULL` |
 | Storage | public bucket `photos` with a read policy |
 | Seeds | word filter, 6 prompt packs / 115 prompts, 154 starter photos |
@@ -50,7 +51,7 @@ Players are guests; the app creates an anonymous session on first launch. (Apple
 
 ```
 start_game → _start_round
-              • judge = players ordered by join time, index (round-1) mod n (none in vote mode)
+              • judge = connected players ordered by join time, index (round-1) mod n (none in vote mode)
               • prompt = unused custom prompt → unused pack prompt → any pack prompt
               • _fill_hands tops every hand up to hand_size, avoiding repeats per player
               • phase = choosing, phase_ends_at = now + round_timer
